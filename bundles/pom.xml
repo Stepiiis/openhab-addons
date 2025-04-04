@@ -139,6 +139,7 @@
     <module>org.openhab.binding.emotiva</module>
     <module>org.openhab.binding.energenie</module>
     <module>org.openhab.binding.energidataservice</module>
+    <module>org.openhab.binding.energymanager</module>
     <module>org.openhab.binding.enigma2</module>
     <module>org.openhab.binding.enocean</module>
     <module>org.openhab.binding.enphase</module>
@@ -561,7 +562,6 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
-
   <build>
     <pluginManagement>
       <plugins>
@@ -631,7 +631,6 @@
         </plugin>
       </plugins>
     </pluginManagement>
-
     <plugins>
       <plugin>
         <groupId>biz.aQute.bnd</groupId>
@@ -697,7 +696,6 @@
       </plugin>
     </plugins>
   </build>
-
   <profiles>
     <!-- suppress embedding of dependencies -->
     <profile>
@@ -723,5 +721,4 @@
       </build>
     </profile>
   </profiles>
-
 </project>

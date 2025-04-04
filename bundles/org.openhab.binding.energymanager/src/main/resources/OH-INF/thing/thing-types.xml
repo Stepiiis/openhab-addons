@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="EnergyManager"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<thing-type id="balancer">
+		<label>Energy Manager Service</label>
+		<description>Monitors energy flows and signals availability for activating loads based on surplus and
+			configuration.
+		</description>
+
+		<channel-groups>
+			<channel-group id="energyStateInputs" typeId="energyStateInputs"/>
+			<channel-group id="stateOutputs" typeId="stateOutputs"/>
+			<channel-group id="settingsInputs" typeId="settingsInputs"/>
+		</channel-groups>
+
+		<config-description>
+			<!-- Required configuration -->
+			<parameter name="refreshInterval" type="integer" min="10" required="true">
+				<label>Refresh Interval (seconds)</label>
+				<description>How often to evaluate energy status and update output signals.</description>
+			</parameter>
+			<parameter name="maxProductionPower" type="integer" min="0" max="100" required="true">
+				<label>Theoretical maximal electricity production power (W)</label>
+				<description>Used to calculate potential surplus if grid feed in is not permitted at the point in
+					time.
+				</description>
+			</parameter>
+
+			<!-- Optional configuration -->
+			<parameter name="minSurplusThresholdWatt" type="integer" min="0" required="false">
+				<label>Minimum Surplus Threshold (W)</label>
+				<description>Minimum surplus power required *in addition* to the load's power before signaling
+					availability. Use this
+					to specify amount of energy *always* available e.g. for BESS or grid feed in.
+				</description>
+				<default>0</default>
+			</parameter>
+			<parameter name="initialDelay" type="integer" min="30" required="false">
+				<label>Initial delay (seconds)</label>
+				<description>Initial delay after configuration loads before the actual evaluation starts.</description>
+				<default>60</default>
+			</parameter>
+			<parameter name="toggleOnNegativePrice" type="boolean" required="false">
+				<label>Auto negative price</label>
+				<description>
+					Toggle all output channels if the price of electricity is negative regardless of the current local
+					production capacity.
+				</description>
+				<default>true</default>
+			</parameter>
+
+			<!-- Nullable optional configuration -->
+			<parameter name="minStorageSoc" type="integer" min="0" max="100" required="false">
+				<label>Minimum BESS SOC (%)</label>
+				<description>
+					Do not signal surplus availability if Battery SOC is below this value.
+					For dynamic adjusting during
+					runtime, do not specify value here and use the appropriate input channel.
+				</description>
+			</parameter>
+			<parameter name="maxStorageSoc" type="integer" min="0" max="100" required="false">
+				<label>Minimum Battery SOC (%)</label>
+				<description>
+					Used to calculate potential surplus if grid feed in is not permitted at the point in time.
+					Use for
+					static configuration. For dynamic configuration, use the maxSocPercent input channel.
+					If neither is provided,
+					assuming value of 100 %.
+				</description>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<channel-group-type id="stateOutputs">
+		<label>Output trigger channels</label>
+		<description>Output channels indicating the availability for the given load.</description>
+		<category>switch</category>
+		<channels>
+			<!-- Example placeholder - User will add real ones -->
+			<channel id="exampleLoad" typeId="surplus-output">
+				<label>Example Load Signal (Add your own)</label>
+			</channel>
+		</channels>
+	</channel-group-type>
+
+
+	<channel-group-type id="settingsInputs">
+		<label>Dynamic setting input channels</label>
+		<category>settings</category>
+		<channels>
+			<channel id="minStorageSoc" typeId="system.battery-level">
+				<label>Minimal SOC</label>
+				<description>
+					Do not signal surplus availability if Battery SOC is below the value of the linked Item.
+					Used only if
+					the static configuration is not specified.
+				</description>
+			</channel>
+			<channel id="maxStorageSoc" typeId="system.battery-level">
+				<label>Maximum reachable SOC</label>
+				<description>
+					Link to Item representing maximum ESS SOC (in Percent, 0-100). Used only if static configuration
+					value
+					is not provided. If neither is provided, assuming value of 100 %.
+				</description>
+			</channel>
+		</channels>
+	</channel-group-type>
+
+	<!-- Input Channels - User links their existing Items here -->
+	<channel-group-type id="energyStateInputs">
+		<label>State input channels</label>
+		<description>Input channels specifying the current state.</description>
+		<category>line</category>
+		<channels>
+			<channel id="productionPower" typeId="system.electric-power">
+				<label>Local electricity production power (W)</label>
+				<description>Link to Item representing current local generation power (in Watts, positive).</description>
+			</channel>
+			<channel id="gridPower" typeId="system.electric-power">
+				<label>Grid Power (W)</label>
+				<description>Link to Item representing grid power (in Watts, negative=feed-in, positive=import).
+				</description>
+			</channel>
+			<channel id="storageSoc" typeId="system.battery-level">
+				<label>ESS state of charge (%)</label>
+				<description>Link to Item representing Battery SOC (in Percent, 0-100).</description>
+			</channel>
+			<channel id="storagePower" typeId="system.electric-power">
+				<label>ESS power (W)</label>
+				<description>Link to Item representing ESS power draw (in Watts, negative=charging, positive=discharging).
+				</description>
+			</channel>
+			<channel id="electricityPrice" typeId="price-input">
+				<label>Current electricity price</label>
+				<description>
+					Link to Item representing the current electricity price (e.g., EUR/MWh or unitless).
+					Has to be the same
+					unit as in the output channels.
+				</description>
+			</channel>
+		</channels>
+	</channel-group-type>
+
+
+	<channel-type id="price-input">
+		<item-type>Number</item-type>
+		<label>Price Input</label>
+		<state readOnly="true" pattern="%.3f"/>
+	</channel-type>
+
+	<channel-type id="surplus-output">
+		<item-type>Switch</item-type>
+		<label>Surplus Availability Signal</label>
+		<description>Indicates (ON/OFF) if sufficient surplus energy is available for a specific load.</description>
+		<state readOnly="true" pattern="%s"/>
+
+		<config-description>
+			<parameter name="loadPowerWatt" type="integer" min="0" required="true">
+				<label>Load Power (W)</label>
+				<description>The power consumption of the load controlled by this signal.</description>
+				<default>1000</default>
+			</parameter>
+			<parameter name="priority" type="integer" min="1" required="true">
+				<label>Priority</label>
+				<description>Load priority (1 = highest). Higher priority loads are considered first.</description>
+				<default>1</default>
+			</parameter>
+			<parameter name="minRuntimeMinutes" type="integer" min="0" required="false">
+				<label>Min Runtime (minutes)</label>
+				<description>Minimum time the load must stay ON once activated (0 = disabled).</description>
+				<default>0</default>
+			</parameter>
+			<parameter name="minCooldownMinutes" type="integer" min="0" required="false">
+				<label>Min Cooldown (minutes)</label>
+				<description>Minimum time the load must stay OFF once deactivated (0 = disabled).</description>
+				<default>0</default>
+			</parameter>
+			<parameter name="electricityPrice" type="decimal" required="false">
+				<label>Max Electricity Price</label>
+				<description>Do not activate load if electricity price exceeds this value (empty = disabled).
+				</description>
+				<context>number</context>
+			</parameter>
+		</config-description>
+	</channel-type>
+
+</thing:thing-descriptions>
