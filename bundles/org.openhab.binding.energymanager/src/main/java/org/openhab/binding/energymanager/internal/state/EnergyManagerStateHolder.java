@@ -20,7 +20,6 @@ import javax.validation.constraints.NotNull;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.energymanager.internal.enums.InputChannelEnum;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.types.Type;
@@ -46,13 +45,13 @@ public class EnergyManagerStateHolder {
         this.lastDeactivationTime.clear();
     }
 
-    public void saveState(InputChannelEnum channel, @NotNull Type state) {
-        updateLasts(channel.getChannelId(), state);
-        states.put(channel.getChannelId(), state);
+    public void saveState(String key, @NotNull Type state) {
+        updateLasts(key, state);
+        states.put(key, state);
     }
 
-    public @Nullable Type getState(InputChannelEnum channel) {
-        return states.get(channel.getChannelId());
+    public @Nullable Type getState(String key) {
+        return states.get(key);
     }
 
     private void updateLasts(String channelId, Type state) {
@@ -64,15 +63,6 @@ public class EnergyManagerStateHolder {
             }
             logger.debug("Updated channel {} at {}", channelId, now);
         }
-    }
-
-    public void saveState(ChannelUID outputChannel, @NotNull Type state) {
-        updateLasts(outputChannel.getId(), state);
-        states.put(outputChannel.getId(), state);
-    }
-
-    public @Nullable Type getState(ChannelUID channel) {
-        return states.get(channel.getId());
     }
 
     /**

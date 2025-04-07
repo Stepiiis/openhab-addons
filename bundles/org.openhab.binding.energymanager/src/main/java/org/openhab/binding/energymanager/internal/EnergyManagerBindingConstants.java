@@ -37,16 +37,5 @@ public class EnergyManagerBindingConstants {
 
     public static final int MIN_REFRESH_INTERVAL = 10;
 
-    // important! Input output channel definitions are in the enums package
-
-    // public static final ChannelGroupUID CH_GROUP_STATE_INPUT = new ChannelGroupUID("energyStateInputs");
-    // public static final ChannelGroupUID CH_GROUP_STATE_OUTPUT = new ChannelGroupUID("stateOutputs");
-    // public static final ChannelGroupUID CH_GROUP_SETTINGS_INPUTS = new ChannelGroupUID("settingsInputs");
-
-    // public static final ChannelGroupTypeUID CH_GROUP_TYPE_STATE_INPUTS = new
-    // ChannelGroupTypeUID(BINDING_ID,"energyStateInputs");
-    // public static final ChannelGroupTypeUID CH_GROUP_TYPE_STATE_OUTPUT = new
-    // ChannelGroupTypeUID(BINDING_ID,"stateOutputs");
-    // public static final ChannelGroupTypeUID CH_GROUP_TYPE_SETTINGS_INPUTS = new
-    // ChannelGroupTypeUID(BINDING_ID,"settingsInputs");
+    // important! Output channel parameter definitions and InputItemNames are in the enums package
 }

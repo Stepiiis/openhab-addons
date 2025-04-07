@@ -15,14 +15,14 @@ package org.openhab.binding.energymanager.internal.enums;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link InputChannelEnum} enum represents the input channels of the binding.
+ * The {@link InputStateItem} enum represents the input channels of the binding.
  * important! Enums should always reflect the specification in thing-types.xml
  *
  * @author <Štěpán Beran> - Initial contribution
  */
 @NonNullByDefault
-public enum InputChannelEnum {
-    PRODUCTION("productionPower"),
+public enum InputStateItem {
+    PRODUCTION_POWER("productionPower"),
     GRID_POWER("gridPower"),
     MIN_STORAGE_SOC("minStorageSoc"),
     MAX_STORAGE_SOC("maxStorageSoc"),
@@ -32,7 +32,7 @@ public enum InputChannelEnum {
 
     private final String channelId;
 
-    InputChannelEnum(String channelId) {
+    InputStateItem(String channelId) {
         this.channelId = channelId;
     }
 

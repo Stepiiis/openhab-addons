@@ -13,7 +13,6 @@
 package org.openhab.binding.energymanager.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * The {@link EnergyManagerConfiguration} class contains fields mapping thing configuration parameters.
@@ -22,10 +21,12 @@ import org.eclipse.jdt.annotation.Nullable;
  */
 @NonNullByDefault
 public record EnergyManagerConfiguration(
-        // required
+        // required settings
         int refreshInterval, int maxProductionPower,
+        // required settings or item names
+        String minStorageSoc, String maxStorageSoc,
+        // required names of associated items
+        String productionPower, String gridPower, String storageSoc, String storagePower, String electricityPrice,
         // optional with default values
-        int minSurplusThresholdWatt, int initialDelay, boolean toggleOnNegativePrice,
-        // optional without default values
-        @Nullable Integer minStorageSoc, @Nullable Integer maxStorageSoc) {
+        int minSurplusThresholdWatt, int initialDelay, boolean toggleOnNegativePrice) {
 }

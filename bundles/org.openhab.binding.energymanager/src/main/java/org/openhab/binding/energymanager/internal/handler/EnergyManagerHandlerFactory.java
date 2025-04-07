@@ -23,7 +23,9 @@ import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /**
  * The {@link EnergyManagerHandlerFactory} is responsible for creating things and thing
@@ -37,6 +39,13 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_MANAGER);
 
+    private final EnergyManagerEventHandler eventsSubscriber;
+
+    @Activate
+    public EnergyManagerHandlerFactory(@Reference EnergyManagerEventHandler eventsSubscriber) {
+        this.eventsSubscriber = eventsSubscriber;
+    }
+
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
@@ -47,7 +56,7 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (THING_TYPE_MANAGER.equals(thingTypeUID)) {
-            return new EnergyManagerHandler(thing);
+            return new EnergyManagerHandler(thing, eventsSubscriber);
         }
 
         return null;

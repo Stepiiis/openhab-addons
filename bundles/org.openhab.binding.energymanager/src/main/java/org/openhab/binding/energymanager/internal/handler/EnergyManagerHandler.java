@@ -12,7 +12,7 @@
  */
 package org.openhab.binding.energymanager.internal.handler;
 
-import static org.openhab.binding.energymanager.internal.enums.InputChannelEnum.*;
+import static org.openhab.binding.energymanager.internal.enums.InputStateItem.*;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -26,12 +26,13 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
-import org.openhab.binding.energymanager.internal.enums.InputChannelEnum;
+import org.openhab.binding.energymanager.internal.enums.InputStateItem;
 import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
 import org.openhab.binding.energymanager.internal.model.ManagerState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
@@ -57,31 +58,66 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     private final EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
 
+    private final EnergyManagerEventHandler eventsHandler;
+
     private @Nullable ScheduledFuture<?> evaluationJob;
 
     private volatile boolean notReady = false;
 
-    public EnergyManagerHandler(Thing thing) {
+    public EnergyManagerHandler(Thing thing, EnergyManagerEventHandler eventsHandler) {
         super(thing);
+        this.eventsHandler = eventsHandler;
     }
 
     @Override
     public void initialize() {
-        if (!validateConfigAndStartEvalJob()) {
+        if (!reinitialize()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid configuration.");
             return;
         }
         updateStatus(ThingStatus.ONLINE);
     }
 
-    private boolean validateConfigAndStartEvalJob() {
+    private static void tryParsingAsNumberElseAddToMap(String config, Map<String, InputStateItem> itemMapping,
+            InputStateItem inputStateName) {
+        try {
+            Integer.parseInt(config);
+        } catch (NumberFormatException e) {
+            itemMapping.put(config, inputStateName);
+        }
+    }
+
+    private boolean reinitialize() {
+        eventsHandler.unregisterEventsFor(thing.getUID());
+
         EnergyManagerConfiguration config = loadAndValidateConfig();
         if (config == null) {
             return false;
         }
 
         startEvaluationJob(config);
+
+        registerEvents(config);
+
         return true;
+    }
+
+    private void registerEvents(EnergyManagerConfiguration config) {
+        Map<String, InputStateItem> itemMapping = new HashMap<>();
+        for (InputStateItem inputStateName : values()) {
+            switch (inputStateName) {
+                case PRODUCTION_POWER -> itemMapping.put(config.productionPower(), inputStateName);
+                case GRID_POWER -> itemMapping.put(config.gridPower(), inputStateName);
+                case STORAGE_SOC -> itemMapping.put(config.storageSoc(), inputStateName);
+                case STORAGE_POWER -> itemMapping.put(config.storagePower(), inputStateName);
+                case ELECTRICITY_PRICE -> itemMapping.put(config.electricityPrice(), inputStateName);
+                case MIN_STORAGE_SOC ->
+                    tryParsingAsNumberElseAddToMap(config.minStorageSoc(), itemMapping, inputStateName);
+                case MAX_STORAGE_SOC ->
+                    tryParsingAsNumberElseAddToMap(config.maxStorageSoc(), itemMapping, inputStateName);
+            }
+        }
+        eventsHandler.registerEventsFor(thing.getUID(), itemMapping, this::handleItemUpdate);
     }
 
     private @Nullable EnergyManagerConfiguration loadAndValidateConfig() {
@@ -106,21 +142,19 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public synchronized void handleCommand(ChannelUID channelUID, Command command) {
-        String channelId = channelUID.getId();
-        try {
-            InputChannelEnum inChannel = InputChannelEnum.valueOf(channelId);
-            logger.trace("Received command '{}' for channel '{}'", command, channelUID);
-            stateHolder.saveState(inChannel, command);
+        logger.warn("Binding does not have any input channels. Received command '{}' for unknown channel '{}'. ",
+                command, channelUID);
+    }
 
-        } catch (IllegalArgumentException ex) {
-            logger.warn("Received command '{}' for unknown channel '{}'", command, channelUID);
-        }
+    private void handleItemUpdate(InputStateItem item, ItemStateEvent itemEvent) {
+        logger.trace("Received value '{}' for item '{}'", itemEvent.getPayload(), item);
+        stateHolder.saveState(item.toString(), new DecimalType(itemEvent.getPayload()));
     }
 
     @Override
     protected void updateState(ChannelUID channelUID, State state) {
         super.updateState(channelUID, state);
-        stateHolder.saveState(channelUID, state);
+        stateHolder.saveState(channelUID.getId(), state);
     }
 
     @Override
@@ -132,7 +166,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
         super.handleConfigurationUpdate(configurationParameters);
 
-        if (validateConfigAndStartEvalJob()) {
+        if (reinitialize()) {
             updateStatus(ThingStatus.ONLINE);
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid configuration.");
@@ -141,7 +175,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
-        Type savedState = stateHolder.getState(channelUID);
+        Type savedState = stateHolder.getState(channelUID.getId());
         if (savedState != null && !(savedState instanceof OnOffType)) {
             // This should never happen, throwing exception because if this happens, there must be much bigger problems
             // to solve
@@ -157,15 +191,15 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private void setAllOutputSignals(OnOffType state, boolean forceUpdate) {
+    private void updateAllOutputChannels(OnOffType state, boolean forceUpdate) {
         getThing().getChannels().stream().filter(ch -> ch.getChannelTypeUID() != null)
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
                 .forEach(ch -> updateOutputState(ch.getUID(), state, forceUpdate));
         logger.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
     }
 
-    private @Nullable DecimalType getStateInDecimal(InputChannelEnum channel) {
-        Type state = stateHolder.getState(channel);
+    private @Nullable DecimalType getStateInDecimal(InputStateItem item) {
+        Type state = stateHolder.getState(item.getChannelId());
         switch (state) {
             case null -> {
                 return null;
@@ -173,7 +207,6 @@ public class EnergyManagerHandler extends BaseThingHandler {
             case QuantityType<?> quantityType -> {
                 // Assumes base unit (W, %, or unitless for price)
                 return new DecimalType(quantityType.toBigDecimal());
-                // Assumes base unit (W, %, or unitless for price)
             }
             case PercentType percentType -> {
                 return new DecimalType(percentType.toBigDecimal());
@@ -182,7 +215,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 return decimalType;
             }
             case OnOffType ignored -> {
-                logger.trace("Cannot convert OnOffType state directly to Decimal for channel {}", channel);
+                logger.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
                 return null;
             }
             default -> {
@@ -190,7 +223,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 try {
                     return DecimalType.valueOf(state.toString());
                 } catch (NumberFormatException e) {
-                    logger.warn("Cannot parse state '{}' from channel {} to DecimalType", state, channel);
+                    logger.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
                     return null;
                 }
             }
@@ -198,7 +231,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private void startEvaluationJob(EnergyManagerConfiguration config) {
-        setAllOutputSignals(OnOffType.OFF, true);
+        updateAllOutputChannels(OnOffType.OFF, true);
         if (evaluationJob == null || evaluationJob.isCancelled()) {
             if (config.refreshInterval() <= 0) {
                 logger.warn("Cannot start evaluation job: refresh interval is invalid ({}).", config.refreshInterval());
@@ -247,14 +280,14 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
         if (config.toggleOnNegativePrice() && state.electricityPrice() != null
                 && state.electricityPrice().doubleValue() < 0) {
-            setAllOutputSignals(OnOffType.ON, false);
+            updateAllOutputChannels(OnOffType.ON, false);
             return;
         }
 
         if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
             logger.info("Battery SOC {}% is below minimum {}%. Disabling all loads.", state.storageSoc().doubleValue(),
                     state.minStorageSoc().doubleValue());
-            setAllOutputSignals(OnOffType.OFF, false);
+            updateAllOutputChannels(OnOffType.OFF, false);
             return;
         }
 
@@ -277,7 +310,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
             ChannelUID channelUID = channel.getUID();
             Configuration channelConfig = channel.getConfiguration();
             // Default state of channels is OFF
-            OnOffType currentState = (OnOffType) Objects.requireNonNullElse(stateHolder.getState(channelUID),
+            OnOffType currentState = (OnOffType) Objects.requireNonNullElse(stateHolder.getState(channelUID.getId()),
                     OnOffType.OFF);
 
             SurplusOutputParameters outConfig = getOutputChannelConfig(channelConfig);
@@ -298,13 +331,15 @@ public class EnergyManagerHandler extends BaseThingHandler {
         logger.debug("Finished periodic evaluating of energy surplus.");
     }
 
-    private static DecimalType getMinSocOrDefault(EnergyManagerConfiguration config,
-            @Nullable DecimalType fromChannel) {
-        Integer configSoc = config.minStorageSoc();
-        if (configSoc != null) {
-            return new DecimalType(configSoc);
+    private DecimalType getMinSocOrDefault(EnergyManagerConfiguration config) {
+        try {
+            Integer fromConfig = Integer.valueOf(config.minStorageSoc());
+            return new DecimalType(fromConfig);
+        } catch (NumberFormatException e) {
+            // do nothing
         }
 
+        DecimalType fromChannel = this.getStateInDecimal(MIN_STORAGE_SOC);
         if (fromChannel != null) {
             return fromChannel;
         }
@@ -312,12 +347,15 @@ public class EnergyManagerHandler extends BaseThingHandler {
         return EnergyManagerBindingConstants.DEFAULT_MIN_STORAGE_SOC;
     }
 
-    private DecimalType getMaxSocOrDefault(EnergyManagerConfiguration config, @Nullable DecimalType fromChannel) {
-        Integer configSoc = config.maxStorageSoc();
-        if (configSoc != null) {
-            return new DecimalType(configSoc);
+    private DecimalType getMaxSocOrDefault(EnergyManagerConfiguration config) {
+        try {
+            Integer fromConfig = Integer.valueOf(config.maxStorageSoc());
+            return new DecimalType(fromConfig);
+        } catch (NumberFormatException e) {
+            // do nothing
         }
 
+        DecimalType fromChannel = this.getStateInDecimal(MAX_STORAGE_SOC);
         if (fromChannel != null) {
             return fromChannel;
         }
@@ -371,7 +409,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     private @Nullable ManagerState buildManagerState(EnergyManagerConfiguration config) {
         var builder = ManagerState.builder();
 
-        DecimalType production = this.getStateInDecimal(PRODUCTION);
+        DecimalType production = this.getStateInDecimal(PRODUCTION_POWER);
         DecimalType gridPower = this.getStateInDecimal(GRID_POWER);
         DecimalType storageSoc = this.getStateInDecimal(STORAGE_SOC);
         DecimalType storagePower = this.getStateInDecimal(STORAGE_POWER);
@@ -383,9 +421,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
         // Required values
         builder.productionPower(production).gridPower(gridPower).storageSoc(storageSoc).storagePower(storagePower)
                 // optional values with default values or null if not needed
-                .electricityPrice(this.getStateInDecimal(ELECTRICITY_PRICE))
-                .minStorageSoc(getMinSocOrDefault(config, this.getStateInDecimal(MIN_STORAGE_SOC)))
-                .maxStorageSoc(getMaxSocOrDefault(config, this.getStateInDecimal(MAX_STORAGE_SOC)));
+                .electricityPrice(this.getStateInDecimal(ELECTRICITY_PRICE)).minStorageSoc(getMinSocOrDefault(config))
+                .maxStorageSoc(getMaxSocOrDefault(config));
 
         return builder.build();
     }
@@ -421,6 +458,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         if (state.productionPower().doubleValue() <= 0) {
             return 0;
         }
+        Thing thing = getThing();
 
         // All grid feed in is considered surplus energy
         double availableSurplusW = (state.gridPower().doubleValue() < 0) ? -state.gridPower().doubleValue() : 0;
