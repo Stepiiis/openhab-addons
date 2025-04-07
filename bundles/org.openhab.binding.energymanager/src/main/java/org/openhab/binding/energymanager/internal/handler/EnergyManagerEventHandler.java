@@ -36,6 +36,7 @@ import org.osgi.service.component.annotations.Component;
 public class EnergyManagerEventHandler extends AbstractItemEventSubscriber {
 
     Map<String, Set<ConsumerMetadata>> eventConsumers = new ConcurrentHashMap<>();
+    final Object lock = new Object();
 
     @Override
     protected void receiveUpdate(ItemStateEvent updateEvent) {
@@ -45,15 +46,20 @@ public class EnergyManagerEventHandler extends AbstractItemEventSubscriber {
         }
     }
 
-    public synchronized void registerEventsFor(ThingUID thingUID, Map<String, InputStateItem> itemMapping,
-            BiConsumer<InputStateItem, ItemStateEvent> consumer) {
-        itemMapping.keySet()
-                .forEach(itemName -> eventConsumers.computeIfAbsent(itemName, k -> ConcurrentHashMap.newKeySet())
-                        .add(new ConsumerMetadata(thingUID, itemMapping.get(itemName), consumer)));
+    public void registerEventsFor (ThingUID thingUID, Map < String, InputStateItem > itemMapping,
+            BiConsumer < InputStateItem, ItemStateEvent > consumer){
+        synchronized (lock) {
+            itemMapping.keySet()
+                    .forEach(itemName -> eventConsumers.computeIfAbsent(itemName, k -> ConcurrentHashMap.newKeySet())
+                            .add(new ConsumerMetadata(thingUID, itemMapping.get(itemName), consumer)));
+        }
     }
 
-    public synchronized void unregisterEventsFor(ThingUID thingUID) {
-        // assuming there will not be many instances, therefore linear complexity is sufficient
-        eventConsumers.forEach((key, value) -> value.removeIf(v -> v.thingUID().equals(thingUID)));
+    public  void unregisterEventsFor (ThingUID thingUID){
+        synchronized (lock) {
+            // assuming there will not be many instances, therefore linear complexity is sufficient
+            eventConsumers.forEach((key, value) -> value.removeIf(v -> v.thingUID().equals(thingUID)));
+        }
     }
+
 }
