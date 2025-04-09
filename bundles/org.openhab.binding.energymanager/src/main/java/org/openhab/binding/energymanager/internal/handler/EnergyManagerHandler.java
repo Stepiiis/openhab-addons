@@ -53,10 +53,9 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class EnergyManagerHandler extends BaseThingHandler {
+    private final Logger LOGGER = LoggerFactory.getLogger(EnergyManagerHandler.class);
 
-    private final Logger logger = LoggerFactory.getLogger(EnergyManagerHandler.class);
-
-    private final EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
+    private final EnergyManagerStateHolder stateHolder;
 
     private final EnergyManagerEventSubscriber eventsHandler;
 
@@ -67,6 +66,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     public EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventsHandler) {
         super(thing);
         this.eventsHandler = eventsHandler;
+        this.stateHolder = new EnergyManagerStateHolder();
     }
 
     @Override
@@ -132,7 +132,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public void dispose() {
-        logger.debug("Disposing Energy Manager Handler for {}", getThing().getUID());
+        LOGGER.debug("Disposing Energy Manager Handler for {}", getThing().getUID());
         stopEvaluationJob();
 
         stateHolder.clear();
@@ -142,12 +142,12 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public synchronized void handleCommand(ChannelUID channelUID, Command command) {
-        logger.warn("Binding does not have any input channels. Received command '{}' for unknown channel '{}'. ",
+        LOGGER.warn("Binding does not have any input channels. Received command '{}' for unknown channel '{}'. ",
                 command, channelUID);
     }
 
     private void handleItemUpdate(InputStateItem item, ItemStateEvent itemEvent) {
-        logger.trace("Received value '{}' for item '{}'", itemEvent.getPayload(), item);
+        LOGGER.trace("Received value '{}' for item '{}'", itemEvent.getPayload(), item);
         stateHolder.saveState(item.toString(), new DecimalType(itemEvent.getPayload()));
     }
 
@@ -159,7 +159,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
-        logger.debug("Handling configuration update for {}", getThing().getUID());
+        LOGGER.debug("Handling configuration update for {}", getThing().getUID());
         updateStatus(ThingStatus.INITIALIZING);
 
         stopEvaluationJob();
@@ -170,7 +170,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
             updateStatus(ThingStatus.ONLINE);
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid configuration.");
-            logger.warn("Energy Balancer Handler for {} disabled due invalid configuration.", getThing().getUID());
+            LOGGER.warn("Energy Balancer Handler for {} disabled due invalid configuration.", getThing().getUID());
         }
     }
 
@@ -178,16 +178,16 @@ public class EnergyManagerHandler extends BaseThingHandler {
         updateAllOutputChannels(OnOffType.OFF, true);
         if (evaluationJob == null || evaluationJob.isCancelled()) {
             if (config.refreshInterval() <= 0) {
-                logger.warn("Cannot start evaluation job: refresh interval is invalid ({}).", config.refreshInterval());
+                LOGGER.warn("Cannot start evaluation job: refresh interval is invalid ({}).", config.refreshInterval());
                 return;
             }
 
             evaluationJob = scheduler.scheduleWithFixedDelay(() -> this.evaluateEnergyBalance(config),
                     config.initialDelay(), config.refreshInterval(), TimeUnit.SECONDS);
-            logger.info("Scheduling periodic evaluation job to start in {} seconds for {} running every {} seconds",
+            LOGGER.info("Scheduling periodic evaluation job to start in {} seconds for {} running every {} seconds",
                     config.initialDelay(), getThing().getUID(), config.refreshInterval());
         } else {
-            logger.trace("Evaluation job already running.");
+            LOGGER.trace("Evaluation job already running.");
         }
     }
 
@@ -195,16 +195,16 @@ public class EnergyManagerHandler extends BaseThingHandler {
         if (evaluationJob != null && !evaluationJob.isCancelled()) {
             evaluationJob.cancel(true);
             evaluationJob = null;
-            logger.info("Stopped energy balance evaluation job for {}", getThing().getUID());
+            LOGGER.info("Stopped energy balance evaluation job for {}", getThing().getUID());
         }
     }
 
     private synchronized void evaluateEnergyBalance(EnergyManagerConfiguration config) {
-        logger.debug("Evaluating energy balance for {} (Periodic)", getThing().getUID());
+        LOGGER.debug("Evaluating energy balance for {} (Periodic)", getThing().getUID());
 
         ManagerState state = buildManagerState(config);
         if (state == null) {
-            logger.warn("Cannot build ManagerState: One or more required input state is null.");
+            LOGGER.warn("Cannot build ManagerState: One or more required input state is null.");
             if (!notReady) {
                 updateStatus(ThingStatus.INITIALIZING, ThingStatusDetail.NOT_YET_READY,
                         "One or more required input state is still null. It has either not yet received an update or is invalid");
@@ -218,7 +218,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
             notReady = false;
         }
 
-        logger.debug("Inputs: state={}", state);
+        LOGGER.debug("Inputs: state={}", state);
 
         double availableSurplusW = getAvailableSurplusWattage(state, config);
 
@@ -229,7 +229,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
 
         if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
-            logger.info("Battery SOC {}% is below minimum {}%. Disabling all loads.", state.storageSoc().doubleValue(),
+            LOGGER.info("Battery SOC {}% is below minimum {}%. Disabling all loads.", state.storageSoc().doubleValue(),
                     state.minStorageSoc().doubleValue());
             updateAllOutputChannels(OnOffType.OFF, false);
             return;
@@ -242,12 +242,12 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 .toList();
 
         if (outputChannels.isEmpty()) {
-            logger.debug("No output channels of type '{}' configured.",
+            LOGGER.debug("No output channels of type '{}' configured.",
                     EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT);
             return;
         }
 
-        logger.debug("Evaluating {} output channels by priority...", outputChannels.size());
+        LOGGER.debug("Evaluating {} output channels by priority...", outputChannels.size());
         Instant now = Instant.now();
 
         for (Channel channel : outputChannels) {
@@ -260,19 +260,19 @@ public class EnergyManagerHandler extends BaseThingHandler {
             SurplusOutputParameters outConfig = getOutputChannelConfig(channelConfig);
 
             if (outConfig.loadPowerWatt() <= 0) {
-                logger.error("Channel {} has invalid load power (<= 0).", channelUID.getId());
+                LOGGER.error("Channel {} has invalid load power (<= 0).", channelUID.getId());
             }
 
             OnOffType desiredState = getDesiredState(config, availableSurplusW, outConfig, state);
             OnOffType finalState = getFinalState(channel, outConfig, currentState, desiredState, now);
 
             updateOutputState(channelUID, finalState, false);
-            logger.debug("Updated status of channel {} to {}", channelUID.getId(), finalState);
+            LOGGER.debug("Updated status of channel {} to {}", channelUID.getId(), finalState);
             if (finalState == OnOffType.ON) {
                 break;
             }
         }
-        logger.debug("Finished periodic evaluating of energy surplus.");
+        LOGGER.debug("Finished periodic evaluating of energy surplus.");
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
@@ -288,7 +288,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         if (forceUpdate || newState != previousState) {
             updateState(channelUID, newState);
         } else {
-            logger.trace("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
+            LOGGER.trace("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
         }
     }
 
@@ -296,7 +296,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         getThing().getChannels().stream().filter(ch -> ch.getChannelTypeUID() != null)
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
                 .forEach(ch -> updateOutputState(ch.getUID(), state, forceUpdate));
-        logger.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
+        LOGGER.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
     }
 
     private @Nullable DecimalType getStateInDecimal(InputStateItem item) {
@@ -316,7 +316,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 return decimalType;
             }
             case OnOffType ignored -> {
-                logger.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
+                LOGGER.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
                 return null;
             }
             default -> {
@@ -324,7 +324,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 try {
                     return DecimalType.valueOf(state.toString());
                 } catch (NumberFormatException e) {
-                    logger.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
+                    LOGGER.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
                     return null;
                 }
             }
@@ -398,7 +398,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
 
         if (statePrice == null) {
-            logger.error("Input channel with electricity price contains null value. Cannot evaluate based on price.");
+            LOGGER.error("Input channel with electricity price contains null value. Cannot evaluate based on price.");
             // Return true as a fallback to avoid blocking operation
             return true;
         }
@@ -434,14 +434,14 @@ public class EnergyManagerHandler extends BaseThingHandler {
             try {
                 Object prop = configuration.getProperties().get(property.name());
                 if (prop == null) {
-                    logger.error(
+                    LOGGER.error(
                             "Failed reading channel input property {} from configuration. Property not found in thing configuration.",
                             property.name());
                     continue;
                 }
                 builderMethods.get(property.name()).invoke(builder, prop);
             } catch (Exception e) {
-                logger.error("Failed reading channel input property {} from configuration. {}", property.name(),
+                LOGGER.error("Failed reading channel input property {} from configuration. {}", property.name(),
                         e.getMessage());
             }
         }
@@ -479,7 +479,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
             }
         }
 
-        logger.debug("Calculated Surplus (Grid Feed-in): {}W", availableSurplusW);
+        LOGGER.debug("Calculated Surplus (Grid Feed-in): {}W", availableSurplusW);
         return availableSurplusW;
     }
 }

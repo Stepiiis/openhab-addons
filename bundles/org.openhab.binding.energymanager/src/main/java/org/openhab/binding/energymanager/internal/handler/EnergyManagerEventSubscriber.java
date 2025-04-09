@@ -87,7 +87,8 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
         } catch (RejectedExecutionException rejectionException) {
             LOGGER.debug("Handler already disposed, cannot submit task.");
         } catch (Exception ex) {
-            LOGGER.error("Failed to submit task for processing of value update consumer of {} for item {} with error: [{}]",
+            LOGGER.error(
+                    "Failed to submit task for processing of value update consumer of {} for item {} with error: [{}]",
                     metadata.thingUID(), metadata.inputStateItem(), ex.toString());
         }
     }

@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class EnergyManagerStateHolder {
-    private final Logger logger = LoggerFactory.getLogger(EnergyManagerStateHolder.class);
+    private final Logger LOGGER = LoggerFactory.getLogger(EnergyManagerStateHolder.class);
 
     private final Map<String, Type> states = new ConcurrentHashMap<>();
     private final Map<String, Instant> lastActivationTime = new ConcurrentHashMap<>();
@@ -61,7 +61,7 @@ public class EnergyManagerStateHolder {
                 case ON -> lastActivationTime.put(channelId, now);
                 case OFF -> lastDeactivationTime.put(channelId, now);
             }
-            logger.debug("Updated channel {} at {}", channelId, now);
+            LOGGER.debug("Updated channel {} at {}", channelId, now);
         }
     }
 
