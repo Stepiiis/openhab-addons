@@ -29,7 +29,7 @@ public enum SurplusOutputParametersEnum {
     PRIORITY("priority"),
     MIN_RUNTIME_MINUTES("minRuntimeMinutes"),
     MIN_COOLDOWN_MINUTES("minCooldownMinutes"),
-    ELECTRICITY_PRICE("electricityPrice"),;
+    ELECTRICITY_PRICE("maxElectricityPrice"),;
 
     private final String propertyName;
 

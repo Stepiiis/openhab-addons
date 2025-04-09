@@ -123,7 +123,7 @@
 				<description>Minimum time the load must stay OFF once deactivated (0 = disabled).</description>
 				<default>0</default>
 			</parameter>
-			<parameter name="electricityPrice" type="decimal" required="false">
+			<parameter name="maxElectricityPrice" type="decimal" required="false">
 				<label>Max Electricity Price</label>
 				<description>Do not activate load if electricity price exceeds this value (empty = disabled).
 				</description>

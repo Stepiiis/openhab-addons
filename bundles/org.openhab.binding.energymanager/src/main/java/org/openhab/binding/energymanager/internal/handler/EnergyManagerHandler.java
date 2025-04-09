@@ -390,16 +390,15 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private boolean isIsPriceAcceptable(SurplusOutputParameters config, ManagerState state) {
-        Integer configPrice = config.electricityPrice();
-        DecimalType statePrice = state.electricityPrice();
-
+        Integer configPrice = config.maxElectricityPrice();
         if (configPrice == null) {
             return true; // No price constraint, always acceptable
         }
 
+        DecimalType statePrice = state.electricityPrice();
         if (statePrice == null) {
             LOGGER.error("Input channel with electricity price contains null value. Cannot evaluate based on price.");
-            // Return true as a fallback to avoid blocking operation
+            // Return true as a fallback
             return true;
         }
 

@@ -24,7 +24,7 @@ import org.eclipse.jdt.annotation.Nullable;
  */
 @NonNullByDefault
 public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable Integer minRuntimeMinutes,
-        @Nullable Integer minCooldownMinutes, @Nullable Integer electricityPrice) {
+        @Nullable Integer minCooldownMinutes, @Nullable Integer maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
         return new SurplusOutputParametersBuilder();
@@ -35,7 +35,7 @@ public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable
         private int priority;
         private @Nullable Integer minRuntimeMinutes;
         private @Nullable Integer minCooldownMinutes;
-        private @Nullable Integer electricityPrice;
+        private @Nullable Integer maxElectricityPrice;
 
         private SurplusOutputParametersBuilder() {
             // Private constructor to prevent direct instantiation
@@ -65,14 +65,14 @@ public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable
             return this;
         }
 
-        public SurplusOutputParametersBuilder electricityPrice(@Nullable Integer electricityPrice) {
-            this.electricityPrice = electricityPrice;
+        public SurplusOutputParametersBuilder maxElectricityPrice(@Nullable Integer maxElectricityPrice) {
+            this.maxElectricityPrice = maxElectricityPrice;
             return this;
         }
 
         public SurplusOutputParameters build() {
             return new SurplusOutputParameters(loadPowerWatt, priority, minRuntimeMinutes, minCooldownMinutes,
-                    electricityPrice);
+                    maxElectricityPrice);
         }
     }
 }
