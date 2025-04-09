@@ -43,6 +43,11 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
     final Object lock = new Object();
 
     @Override
+    public @Nullable EventFilter getEventFilter() {
+        return event -> event instanceof ItemStateEvent;
+    }
+
+    @Override
     protected void receiveUpdate(ItemStateEvent updateEvent) {
         if (eventConsumers.containsKey(updateEvent.getItemName())) {
             eventConsumers.get(updateEvent.getItemName())
