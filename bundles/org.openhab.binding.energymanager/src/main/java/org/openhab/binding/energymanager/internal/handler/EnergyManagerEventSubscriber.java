@@ -13,10 +13,12 @@
 package org.openhab.binding.energymanager.internal.handler;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BiConsumer;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -41,22 +43,20 @@ import org.slf4j.LoggerFactory;
  * @author <Štěpán Beran> - Initial contribution
  */
 @NonNullByDefault
-@Component(service = {EnergyManagerEventSubscriber.class, EventSubscriber.class})
+@Component(service = { EnergyManagerEventSubscriber.class, EventSubscriber.class })
 public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
-    private static final Logger log = LoggerFactory.getLogger(EnergyManagerEventSubscriber.class);
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(EnergyManagerEventSubscriber.class);
 
     private final Map<String, Set<ConsumerWithMetadata>> eventConsumers;
     private final ExecutorService executorService;
     final Object lock = new Object();
-
 
     @Activate
     public EnergyManagerEventSubscriber() {
         eventConsumers = new ConcurrentHashMap<>();
         // using virtual threads because of their lightweight nature
         executorService = Executors.newVirtualThreadPerTaskExecutor();
-        log.trace("Event manager Initialized");
+        LOGGER.trace("Event manager Initialized");
     }
 
     @Override
@@ -64,25 +64,36 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
         return event -> event instanceof ItemStateEvent;
     }
 
+    /**
+     * Executes consumers of relevant incoming items in background threads so that we don't block the openHAB event bus.
+     * Any exceptions are handled gracefully with no propagation to the calling thread
+     */
     @Override
     protected void receiveUpdate(ItemStateEvent updateEvent) {
-        var consumers = eventConsumers.get(updateEvent.getItemName());
-        if (consumers != null) {
-            consumers.forEach(consumerMetadata -> {
-                // Execution of consumers in background threads so that we don't block the event bus
-                executorService.submit(() -> {
-                    try {
-                        consumerMetadata.consumer().accept(consumerMetadata.inputStateItem(), updateEvent);
-                    } catch (Exception e) {
-                        log.error(e.getMessage(), e);
-                    }
-                });
+        Optional.ofNullable(eventConsumers.get(updateEvent.getItemName()))
+                .ifPresent(consumers -> consumers.forEach((consumer) -> dispatchForProcessing(consumer, updateEvent)));
+    }
+
+    private void dispatchForProcessing(ConsumerWithMetadata metadata, ItemStateEvent updateEvent) {
+        try {
+            executorService.submit(() -> {
+                try {
+                    metadata.consumer().accept(metadata.inputStateItem(), updateEvent);
+                } catch (Exception ex) {
+                    LOGGER.error("Failed execution of value update consumer of {} for item {} with error: [{}]",
+                            metadata.thingUID(), metadata.inputStateItem(), ex.toString());
+                }
             });
+        } catch (RejectedExecutionException rejectionException) {
+            LOGGER.debug("Handler already disposed, cannot submit task.");
+        } catch (Exception ex) {
+            LOGGER.error("Failed to submit task for processing of value update consumer of {} for item {} with error: [{}]",
+                    metadata.thingUID(), metadata.inputStateItem(), ex.toString());
         }
     }
 
     public void registerEventsFor(ThingUID thingUID, Map<String, InputStateItem> itemMapping,
-                                  BiConsumer<InputStateItem, ItemStateEvent> consumer) {
+            BiConsumer<InputStateItem, ItemStateEvent> consumer) {
         synchronized (lock) {
             itemMapping.keySet()
                     .forEach(itemName -> eventConsumers.computeIfAbsent(itemName, k -> ConcurrentHashMap.newKeySet())
@@ -98,8 +109,8 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
     }
 
     @Deactivate
-    public void deactivate(){
+    public void deactivate() {
         executorService.shutdown();
-        log.trace("Event manager disposed");
+        LOGGER.trace("Event manager disposed");
     }
 }

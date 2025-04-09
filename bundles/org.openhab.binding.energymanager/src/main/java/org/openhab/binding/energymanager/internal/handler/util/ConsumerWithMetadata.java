@@ -24,5 +24,5 @@ import org.openhab.core.thing.ThingUID;
  * @author <Štěpán Beran> - Initial contribution
  */
 public record ConsumerWithMetadata(ThingUID thingUID, InputStateItem inputStateItem,
-                                   BiConsumer<InputStateItem, ItemStateEvent> consumer) {
+        BiConsumer<InputStateItem, ItemStateEvent> consumer) {
 }
