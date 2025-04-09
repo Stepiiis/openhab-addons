@@ -174,62 +174,6 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
-        Type savedState = stateHolder.getState(channelUID.getId());
-        if (savedState != null && !(savedState instanceof OnOffType)) {
-            // This should never happen, throwing exception because if this happens, there must be much bigger problems
-            // to solve
-            throw new IllegalStateException(
-                    "Channel " + channelUID.getId() + " has invalid state type: " + savedState.getClass().getName());
-        }
-        OnOffType previousState = Objects.requireNonNullElse((OnOffType) savedState, OnOffType.OFF);
-
-        if (forceUpdate || newState != previousState) {
-            updateState(channelUID, newState);
-        } else {
-            logger.trace("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
-        }
-    }
-
-    private void updateAllOutputChannels(OnOffType state, boolean forceUpdate) {
-        getThing().getChannels().stream().filter(ch -> ch.getChannelTypeUID() != null)
-                .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
-                .forEach(ch -> updateOutputState(ch.getUID(), state, forceUpdate));
-        logger.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
-    }
-
-    private @Nullable DecimalType getStateInDecimal(InputStateItem item) {
-        Type state = stateHolder.getState(item.getChannelId());
-        switch (state) {
-            case null -> {
-                return null;
-            }
-            case QuantityType<?> quantityType -> {
-                // Assumes base unit (W, %, or unitless for price)
-                return new DecimalType(quantityType.toBigDecimal());
-            }
-            case PercentType percentType -> {
-                return new DecimalType(percentType.toBigDecimal());
-            }
-            case DecimalType decimalType -> {
-                return decimalType;
-            }
-            case OnOffType ignored -> {
-                logger.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
-                return null;
-            }
-            default -> {
-                // Try parsing from string representation as a fallback
-                try {
-                    return DecimalType.valueOf(state.toString());
-                } catch (NumberFormatException e) {
-                    logger.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
-                    return null;
-                }
-            }
-        }
-    }
-
     private void startEvaluationJob(EnergyManagerConfiguration config) {
         updateAllOutputChannels(OnOffType.OFF, true);
         if (evaluationJob == null || evaluationJob.isCancelled()) {
@@ -329,6 +273,62 @@ public class EnergyManagerHandler extends BaseThingHandler {
             }
         }
         logger.debug("Finished periodic evaluating of energy surplus.");
+    }
+
+    private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
+        Type savedState = stateHolder.getState(channelUID.getId());
+        if (savedState != null && !(savedState instanceof OnOffType)) {
+            // This should never happen, throwing exception because if this happens, there must be much bigger problems
+            // to solve
+            throw new IllegalStateException(
+                    "Channel " + channelUID.getId() + " has invalid state type: " + savedState.getClass().getName());
+        }
+        OnOffType previousState = Objects.requireNonNullElse((OnOffType) savedState, OnOffType.OFF);
+
+        if (forceUpdate || newState != previousState) {
+            updateState(channelUID, newState);
+        } else {
+            logger.trace("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
+        }
+    }
+
+    private void updateAllOutputChannels(OnOffType state, boolean forceUpdate) {
+        getThing().getChannels().stream().filter(ch -> ch.getChannelTypeUID() != null)
+                .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
+                .forEach(ch -> updateOutputState(ch.getUID(), state, forceUpdate));
+        logger.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
+    }
+
+    private @Nullable DecimalType getStateInDecimal(InputStateItem item) {
+        Type state = stateHolder.getState(item.getChannelId());
+        switch (state) {
+            case null -> {
+                return null;
+            }
+            case QuantityType<?> quantityType -> {
+                // Assumes base unit (W, %, or unitless for price)
+                return new DecimalType(quantityType.toBigDecimal());
+            }
+            case PercentType percentType -> {
+                return new DecimalType(percentType.toBigDecimal());
+            }
+            case DecimalType decimalType -> {
+                return decimalType;
+            }
+            case OnOffType ignored -> {
+                logger.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
+                return null;
+            }
+            default -> {
+                // Try parsing from string representation as a fallback
+                try {
+                    return DecimalType.valueOf(state.toString());
+                } catch (NumberFormatException e) {
+                    logger.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
+                    return null;
+                }
+            }
+        }
     }
 
     private DecimalType getMinSocOrDefault(EnergyManagerConfiguration config) {
