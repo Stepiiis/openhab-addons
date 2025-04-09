@@ -23,7 +23,7 @@ import java.util.function.BiConsumer;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.energymanager.internal.enums.InputStateItem;
+import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.binding.energymanager.internal.handler.util.ConsumerWithMetadata;
 import org.openhab.core.events.EventFilter;
 import org.openhab.core.events.EventSubscriber;
@@ -78,10 +78,10 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
         try {
             executorService.submit(() -> {
                 try {
-                    metadata.consumer().accept(metadata.inputStateItem(), updateEvent);
+                    metadata.consumer().accept(metadata.thingParameterItemName(), updateEvent);
                 } catch (Exception ex) {
                     LOGGER.error("Failed execution of value update consumer of {} for item {} with error: [{}]",
-                            metadata.thingUID(), metadata.inputStateItem(), ex.toString());
+                            metadata.thingUID(), metadata.thingParameterItemName(), ex.toString());
                 }
             });
         } catch (RejectedExecutionException rejectionException) {
@@ -89,12 +89,12 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
         } catch (Exception ex) {
             LOGGER.error(
                     "Failed to submit task for processing of value update consumer of {} for item {} with error: [{}]",
-                    metadata.thingUID(), metadata.inputStateItem(), ex.toString());
+                    metadata.thingUID(), metadata.thingParameterItemName(), ex.toString());
         }
     }
 
-    public void registerEventsFor(ThingUID thingUID, Map<String, InputStateItem> itemMapping,
-            BiConsumer<InputStateItem, ItemStateEvent> consumer) {
+    public void registerEventsFor(ThingUID thingUID, Map<String, ThingParameterItemName> itemMapping,
+            BiConsumer<ThingParameterItemName, ItemStateEvent> consumer) {
         synchronized (lock) {
             itemMapping.keySet()
                     .forEach(itemName -> eventConsumers.computeIfAbsent(itemName, k -> ConcurrentHashMap.newKeySet())

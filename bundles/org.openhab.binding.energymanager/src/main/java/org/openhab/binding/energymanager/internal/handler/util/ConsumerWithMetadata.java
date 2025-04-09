@@ -14,7 +14,7 @@ package org.openhab.binding.energymanager.internal.handler.util;
 
 import java.util.function.BiConsumer;
 
-import org.openhab.binding.energymanager.internal.enums.InputStateItem;
+import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.thing.ThingUID;
 
@@ -23,6 +23,6 @@ import org.openhab.core.thing.ThingUID;
  *
  * @author <Štěpán Beran> - Initial contribution
  */
-public record ConsumerWithMetadata(ThingUID thingUID, InputStateItem inputStateItem,
-        BiConsumer<InputStateItem, ItemStateEvent> consumer) {
+public record ConsumerWithMetadata(ThingUID thingUID, ThingParameterItemName thingParameterItemName,
+        BiConsumer<ThingParameterItemName, ItemStateEvent> consumer) {
 }

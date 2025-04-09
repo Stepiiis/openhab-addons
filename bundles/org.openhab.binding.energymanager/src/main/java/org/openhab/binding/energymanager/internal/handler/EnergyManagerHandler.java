@@ -12,7 +12,7 @@
  */
 package org.openhab.binding.energymanager.internal.handler;
 
-import static org.openhab.binding.energymanager.internal.enums.InputStateItem.*;
+import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -26,7 +26,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
-import org.openhab.binding.energymanager.internal.enums.InputStateItem;
+import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
 import org.openhab.binding.energymanager.internal.model.ManagerState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
@@ -78,8 +78,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
         updateStatus(ThingStatus.ONLINE);
     }
 
-    private static void tryParsingAsNumberElseAddToMap(String config, Map<String, InputStateItem> itemMapping,
-            InputStateItem inputStateName) {
+    private static void tryParsingAsNumberElseAddToMap(String config, Map<String, ThingParameterItemName> itemMapping,
+            ThingParameterItemName inputStateName) {
         try {
             Integer.parseInt(config);
         } catch (NumberFormatException e) {
@@ -103,8 +103,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private void registerEvents(EnergyManagerConfiguration config) {
-        Map<String, InputStateItem> itemMapping = new HashMap<>();
-        for (InputStateItem inputStateName : values()) {
+        Map<String, ThingParameterItemName> itemMapping = new HashMap<>();
+        for (ThingParameterItemName inputStateName : values()) {
             switch (inputStateName) {
                 case PRODUCTION_POWER -> itemMapping.put(config.productionPower(), inputStateName);
                 case GRID_POWER -> itemMapping.put(config.gridPower(), inputStateName);
@@ -146,7 +146,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 command, channelUID);
     }
 
-    private void handleItemUpdate(InputStateItem item, ItemStateEvent itemEvent) {
+    private void handleItemUpdate(ThingParameterItemName item, ItemStateEvent itemEvent) {
         LOGGER.trace("Received value '{}' for item '{}'", itemEvent.getPayload(), item);
         stateHolder.saveState(item.toString(), new DecimalType(itemEvent.getPayload()));
     }
@@ -299,7 +299,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         LOGGER.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
     }
 
-    private @Nullable DecimalType getStateInDecimal(InputStateItem item) {
+    private @Nullable DecimalType getStateInDecimal(ThingParameterItemName item) {
         Type state = stateHolder.getState(item.getChannelId());
         switch (state) {
             case null -> {
