@@ -58,13 +58,13 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     private final EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
 
-    private final EnergyManagerEventHandler eventsHandler;
+    private final EnergyManagerEventSubscriber eventsHandler;
 
     private @Nullable ScheduledFuture<?> evaluationJob;
 
     private volatile boolean notReady = false;
 
-    public EnergyManagerHandler(Thing thing, EnergyManagerEventHandler eventsHandler) {
+    public EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventsHandler) {
         super(thing);
         this.eventsHandler = eventsHandler;
     }

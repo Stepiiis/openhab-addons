@@ -39,10 +39,10 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_MANAGER);
 
-    private final EnergyManagerEventHandler eventsSubscriber;
+    private final EnergyManagerEventSubscriber eventsSubscriber;
 
     @Activate
-    public EnergyManagerHandlerFactory(@Reference EnergyManagerEventHandler eventsSubscriber) {
+    public EnergyManagerHandlerFactory(@Reference EnergyManagerEventSubscriber eventsSubscriber) {
         this.eventsSubscriber = eventsSubscriber;
     }
 
