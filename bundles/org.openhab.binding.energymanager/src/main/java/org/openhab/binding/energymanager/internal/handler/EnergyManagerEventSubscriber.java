@@ -12,25 +12,21 @@
  */
 package org.openhab.binding.energymanager.internal.handler;
 
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
-import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.enums.InputStateItem;
-import org.openhab.binding.energymanager.internal.handler.util.ConsumerMetadata;
+import org.openhab.binding.energymanager.internal.handler.util.ConsumerWithMetadata;
 import org.openhab.core.events.EventFilter;
 import org.openhab.core.events.EventSubscriber;
 import org.openhab.core.items.events.AbstractItemEventSubscriber;
 import org.openhab.core.items.events.ItemStateEvent;
-import org.openhab.core.model.script.actions.Exec;
 import org.openhab.core.thing.ThingUID;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -50,7 +46,7 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
     private static final Logger log = LoggerFactory.getLogger(EnergyManagerEventSubscriber.class);
 
 
-    private final Map<String, Set<ConsumerMetadata>> eventConsumers;
+    private final Map<String, Set<ConsumerWithMetadata>> eventConsumers;
     private final ExecutorService executorService;
     final Object lock = new Object();
 
@@ -90,7 +86,7 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
         synchronized (lock) {
             itemMapping.keySet()
                     .forEach(itemName -> eventConsumers.computeIfAbsent(itemName, k -> ConcurrentHashMap.newKeySet())
-                            .add(new ConsumerMetadata(thingUID, itemMapping.get(itemName), consumer)));
+                            .add(new ConsumerWithMetadata(thingUID, itemMapping.get(itemName), consumer)));
         }
     }
 

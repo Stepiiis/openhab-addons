@@ -19,10 +19,10 @@ import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.thing.ThingUID;
 
 /**
- * The {@link ConsumerMetadata} is a util class used to represent metadata for a specific thing handler callback.
+ * The {@link ConsumerWithMetadata} is a util class used to represent metadata for a specific thing handler callback.
  *
  * @author <Štěpán Beran> - Initial contribution
  */
-public record ConsumerMetadata(ThingUID thingUID, InputStateItem inputStateItem,
-        BiConsumer<InputStateItem, ItemStateEvent> consumer) {
+public record ConsumerWithMetadata(ThingUID thingUID, InputStateItem inputStateItem,
+                                   BiConsumer<InputStateItem, ItemStateEvent> consumer) {
 }
