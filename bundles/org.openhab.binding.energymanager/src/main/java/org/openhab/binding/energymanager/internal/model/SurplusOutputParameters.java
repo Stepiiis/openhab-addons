@@ -16,23 +16,24 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
- * The {@link SurplusOutputParameters} record represents user specified parameters of surplusOutput channels.
+ * The {@link SurplusOutputParameters} record represents user specified parameters of one surplusOutput channel.
  * important - Field names have to be the same as output channel property names inside thing-types.xml
  *
  * @author <Štěpán Beran> - Initial contribution
  *
  */
 @NonNullByDefault
-public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable Integer minRuntimeMinutes,
-        @Nullable Integer minCooldownMinutes, @Nullable Integer maxElectricityPrice) {
+public record SurplusOutputParameters(int priority, int loadPower, @Nullable Integer switchingPower, @Nullable Integer minRuntimeMinutes,
+                                      @Nullable Integer minCooldownMinutes, @Nullable Integer maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
         return new SurplusOutputParametersBuilder();
     }
 
     public static class SurplusOutputParametersBuilder {
-        private int loadPowerWatt;
         private int priority;
+        private int loadPower;
+        private @Nullable Integer switchingPower;
         private @Nullable Integer minRuntimeMinutes;
         private @Nullable Integer minCooldownMinutes;
         private @Nullable Integer maxElectricityPrice;
@@ -45,8 +46,14 @@ public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable
             return new SurplusOutputParametersBuilder();
         }
 
-        public SurplusOutputParametersBuilder loadPowerWatt(int loadPowerWatt) {
-            this.loadPowerWatt = loadPowerWatt;
+        public SurplusOutputParametersBuilder loadPower(int loadPower) {
+            this.loadPower = loadPower;
+            return this;
+        }
+
+
+        public SurplusOutputParametersBuilder switchingPower(@Nullable Integer switchingPower) {
+            this.switchingPower = switchingPower;
             return this;
         }
 
@@ -71,7 +78,7 @@ public record SurplusOutputParameters(int loadPowerWatt, int priority, @Nullable
         }
 
         public SurplusOutputParameters build() {
-            return new SurplusOutputParameters(loadPowerWatt, priority, minRuntimeMinutes, minCooldownMinutes,
+            return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes, minCooldownMinutes,
                     maxElectricityPrice);
         }
     }

@@ -13,31 +13,40 @@
 package org.openhab.binding.energymanager.internal.enums;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 
 /**
  * The {@link SurplusOutputParametersEnum} represents the output channel properties for the surplus-output type of the
  * output channels.
- * important! important Id has to be the same as property names of
- * {@link org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants#CHANNEL_TYPE_SURPLUS_OUTPUT} inside
- * thing-types.xml
+ *
+ * important! propertyName has to be the same as property names of *
+ * {@link EnergyManagerBindingConstants#CHANNEL_TYPE_SURPLUS_OUTPUT}
+ * inside thing-types.xml
  *
  * @author <Štěpán Beran> - Initial contribution
  */
 @NonNullByDefault
 public enum SurplusOutputParametersEnum {
-    LOAD_POWER_WATT("loadPowerWatt"),
-    PRIORITY("priority"),
-    MIN_RUNTIME_MINUTES("minRuntimeMinutes"),
-    MIN_COOLDOWN_MINUTES("minCooldownMinutes"),
-    ELECTRICITY_PRICE("maxElectricityPrice"),;
+    PRIORITY("priority", true),
+    LOAD_POWER("loadPower", true),
+    LOAD_SWITCHING_POWER("switchingPower", false),
+    MIN_RUNTIME_MINUTES("minRuntimeMinutes", false),
+    MIN_COOLDOWN_MINUTES("minCooldownMinutes", false),
+    ELECTRICITY_PRICE("maxElectricityPrice", false),;
 
     private final String propertyName;
+    private final boolean required;
 
-    SurplusOutputParametersEnum(String id) {
-        this.propertyName = id;
+    SurplusOutputParametersEnum(String propertyName, boolean required) {
+        this.propertyName = propertyName;
+        this.required = required;
     }
 
     public String getPropertyName() {
         return propertyName;
+    }
+
+    public boolean isRequired() {
+        return required;
     }
 }

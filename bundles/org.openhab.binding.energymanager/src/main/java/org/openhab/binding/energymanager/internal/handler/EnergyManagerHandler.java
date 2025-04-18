@@ -12,38 +12,43 @@
  */
 package org.openhab.binding.energymanager.internal.handler;
 
-import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
-
-import java.lang.reflect.Method;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
-import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
-import org.openhab.binding.energymanager.internal.model.ManagerState;
+import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
+import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
+import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
-import org.openhab.core.config.core.Configuration;
+import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.QuantityType;
-import org.openhab.core.thing.*;
+import org.openhab.core.thing.ChannelUID;
+import org.openhab.core.thing.Thing;
+import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
+import static org.openhab.core.types.RefreshType.REFRESH;
 
 /**
  * The {@link EnergyManagerHandler} is responsible for handling commands, which are
@@ -53,42 +58,38 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class EnergyManagerHandler extends BaseThingHandler {
-    private final Logger LOGGER = LoggerFactory.getLogger(EnergyManagerHandler.class);
+    private final Logger LOGGER;
 
     private final EnergyManagerStateHolder stateHolder;
-
-    private final EnergyManagerEventSubscriber eventsHandler;
-
     private @Nullable ScheduledFuture<?> evaluationJob;
 
-    private volatile boolean notReady = false;
+    private volatile boolean wasNotReady = false;
 
-    public EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventsHandler) {
+    private final EnergyManagerEventSubscriber eventSubscriber;
+    private final ConfigUtilService configUtilService;
+    private final EnergyBalancingEngine energyBalancingEngine;
+
+    EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventSubscriber,
+                         ConfigUtilService configUtilService, EnergyManagerStateHolder stateHolder, EnergyBalancingEngine energyBalancingEngine) {
         super(thing);
-        this.eventsHandler = eventsHandler;
-        this.stateHolder = new EnergyManagerStateHolder();
+        this.LOGGER = LoggerFactory.getLogger(EnergyManagerHandler.class);
+
+        this.stateHolder = stateHolder;
+        this.configUtilService = configUtilService;
+        this.eventSubscriber = eventSubscriber;
+        this.energyBalancingEngine = energyBalancingEngine;
     }
 
     @Override
     public void initialize() {
         if (!reinitialize()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid configuration.");
             return;
         }
         updateStatus(ThingStatus.ONLINE);
     }
 
-    private static void tryParsingAsNumberElseAddToMap(String config, Map<String, ThingParameterItemName> itemMapping,
-            ThingParameterItemName inputStateName) {
-        try {
-            Integer.parseInt(config);
-        } catch (NumberFormatException e) {
-            itemMapping.put(config, inputStateName);
-        }
-    }
-
-    private boolean reinitialize() {
-        eventsHandler.unregisterEventsFor(thing.getUID());
+    protected boolean reinitialize() {
+        eventSubscriber.unregisterEventsFor(thing.getUID());
 
         EnergyManagerConfiguration config = loadAndValidateConfig();
         if (config == null) {
@@ -102,7 +103,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         return true;
     }
 
-    private void registerEvents(EnergyManagerConfiguration config) {
+    protected void registerEvents(EnergyManagerConfiguration config) {
         Map<String, ThingParameterItemName> itemMapping = new HashMap<>();
         for (ThingParameterItemName inputStateName : values()) {
             switch (inputStateName) {
@@ -111,19 +112,30 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 case STORAGE_SOC -> itemMapping.put(config.storageSoc(), inputStateName);
                 case STORAGE_POWER -> itemMapping.put(config.storagePower(), inputStateName);
                 case ELECTRICITY_PRICE -> itemMapping.put(config.electricityPrice(), inputStateName);
-                case MIN_STORAGE_SOC ->
-                    tryParsingAsNumberElseAddToMap(config.minStorageSoc(), itemMapping, inputStateName);
-                case MAX_STORAGE_SOC ->
-                    tryParsingAsNumberElseAddToMap(config.maxStorageSoc(), itemMapping, inputStateName);
+                case MIN_STORAGE_SOC, MAX_STORAGE_SOC -> {
+                    var configVal = MIN_STORAGE_SOC.equals(inputStateName) ? config.minStorageSoc()
+                            : config.maxStorageSoc();
+                    try {
+                        Integer.parseInt(configVal);
+                    } catch (NumberFormatException e) {
+                        itemMapping.put(configVal, inputStateName);
+                    }
+                }
             }
         }
-        eventsHandler.registerEventsFor(thing.getUID(), itemMapping, this::handleItemUpdate);
+        eventSubscriber.registerEventsFor(thing.getUID(), itemMapping, this::handleItemUpdate);
     }
 
-    private @Nullable EnergyManagerConfiguration loadAndValidateConfig() {
-        EnergyManagerConfiguration config = getConfigAs(EnergyManagerConfiguration.class);
+    protected @Nullable EnergyManagerConfiguration loadAndValidateConfig() {
+        EnergyManagerConfiguration config = configUtilService.getTypedConfig(getConfig().getProperties());
 
-        if (config.refreshInterval() < EnergyManagerBindingConstants.MIN_REFRESH_INTERVAL) {
+        if (config == null) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Converted configuration is null " + getConfig());
+            return null;
+        }
+
+        if (config.refreshInterval().longValue() < EnergyManagerBindingConstants.MIN_REFRESH_INTERVAL.longValue()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid refresh interval.");
             return null;
         }
@@ -142,13 +154,24 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public synchronized void handleCommand(ChannelUID channelUID, Command command) {
-        LOGGER.warn("Binding does not have any input channels. Received command '{}' for unknown channel '{}'. ",
-                command, channelUID);
+        if (getThing().getChannels().stream()
+                .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
+                .noneMatch(it -> channelUID.equals(it.getUID()))) {
+            LOGGER.warn("Received command '{}' for unexpected channel '{}'. Only {} types are suppoted", command,
+                    channelUID, EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT);
+            return;
+        }
+        if (REFRESH.equals(command)) {
+            reinitialize();
+        }
     }
 
     private void handleItemUpdate(ThingParameterItemName item, ItemStateEvent itemEvent) {
-        LOGGER.trace("Received value '{}' for item '{}'", itemEvent.getPayload(), item);
-        stateHolder.saveState(item.toString(), new DecimalType(itemEvent.getPayload()));
+        // todo test save and retrieve
+        LOGGER.trace("Received value '{}' of internal type '{}' from user item '{}'", itemEvent.getItemState(),
+                item.getChannelId(), itemEvent.getItemName());
+        // todo validate the types of received value
+        stateHolder.saveState(item.getChannelId(), itemEvent.getItemState());
     }
 
     @Override
@@ -177,17 +200,22 @@ public class EnergyManagerHandler extends BaseThingHandler {
     private void startEvaluationJob(EnergyManagerConfiguration config) {
         updateAllOutputChannels(OnOffType.OFF, true);
         if (evaluationJob == null || evaluationJob.isCancelled()) {
-            if (config.refreshInterval() <= 0) {
+            if (config.refreshInterval().longValue() <= 0) {
                 LOGGER.warn("Cannot start evaluation job: refresh interval is invalid ({}).", config.refreshInterval());
                 return;
             }
 
-            evaluationJob = scheduler.scheduleWithFixedDelay(() -> this.evaluateEnergyBalance(config),
-                    config.initialDelay(), config.refreshInterval(), TimeUnit.SECONDS);
+            this.evaluationJob = scheduler.scheduleWithFixedDelay(() ->
+                            energyBalancingEngine.evaluateEnergyBalance(config,
+                                    getThing(),
+                                    getOutputChannels(),
+                                    (inputitemsState) -> verifyStateValueDuringEvaluation(inputitemsState, config),
+                                    this::updateOutputState),
+                    config.initialDelay().longValue(), config.refreshInterval().longValue(), TimeUnit.SECONDS);
             LOGGER.info("Scheduling periodic evaluation job to start in {} seconds for {} running every {} seconds",
                     config.initialDelay(), getThing().getUID(), config.refreshInterval());
         } else {
-            LOGGER.trace("Evaluation job already running.");
+            LOGGER.debug("Evaluation job already running.");
         }
     }
 
@@ -199,84 +227,33 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private synchronized void evaluateEnergyBalance(EnergyManagerConfiguration config) {
-        LOGGER.debug("Evaluating energy balance for {} (Periodic)", getThing().getUID());
+    public boolean isEvaluationJobRunning() {
+        return evaluationJob != null && Future.State.RUNNING.equals(evaluationJob.state());
+    }
 
-        ManagerState state = buildManagerState(config);
-        if (state == null) {
-            LOGGER.warn("Cannot build ManagerState: One or more required input state is null.");
-            if (!notReady) {
-                updateStatus(ThingStatus.INITIALIZING, ThingStatusDetail.NOT_YET_READY,
-                        "One or more required input state is still null. It has either not yet received an update or is invalid");
-                notReady = true;
-            }
-            return;
-        }
 
-        if (notReady) {
-            updateStatus(ThingStatus.ONLINE);
-            notReady = false;
-        }
-
-        LOGGER.debug("Inputs: state={}", state);
-
-        double availableSurplusW = getAvailableSurplusWattage(state, config);
-
-        if (config.toggleOnNegativePrice() && state.electricityPrice() != null
-                && state.electricityPrice().doubleValue() < 0) {
-            updateAllOutputChannels(OnOffType.ON, false);
-            return;
-        }
-
-        if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
-            LOGGER.info("Battery SOC {}% is below minimum {}%. Disabling all loads.", state.storageSoc().doubleValue(),
-                    state.minStorageSoc().doubleValue());
-            updateAllOutputChannels(OnOffType.OFF, false);
-            return;
-        }
-
-        List<Channel> outputChannels = getThing().getChannels().stream()
+    List<Map.Entry<ChannelUID, SurplusOutputParameters>> getOutputChannels() {
+        return getThing().getChannels().stream()
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
-                .sorted(Comparator.comparingInt(ch -> (int) ch.getConfiguration().getProperties()
-                        .getOrDefault(SurplusOutputParametersEnum.PRIORITY.getPropertyName(), Integer.MAX_VALUE)))
-                .toList();
+                .flatMap(ch -> {
+                    var opt = configUtilService.parseSurplusOutputParameters(ch.getConfiguration());
+                    if (opt != null) {
+                        @NonNull
+                        SurplusOutputParameters value = opt;
+                        return Stream.of(Map.entry(ch.getUID(), value));
+                    } else {
+                        LOGGER.error("Could not read channel {} parameters, ignoring it.", ch.getUID());
+                        return Stream.empty();
+                    }
+                }).collect(Collectors.toCollection(ArrayList::new));
+    }
 
-        if (outputChannels.isEmpty()) {
-            LOGGER.debug("No output channels of type '{}' configured.",
-                    EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT);
-            return;
-        }
-
-        LOGGER.debug("Evaluating {} output channels by priority...", outputChannels.size());
-        Instant now = Instant.now();
-
-        for (Channel channel : outputChannels) {
-            ChannelUID channelUID = channel.getUID();
-            Configuration channelConfig = channel.getConfiguration();
-            // Default state of channels is OFF
-            OnOffType currentState = (OnOffType) Objects.requireNonNullElse(stateHolder.getState(channelUID.getId()),
-                    OnOffType.OFF);
-
-            SurplusOutputParameters outConfig = getOutputChannelConfig(channelConfig);
-
-            if (outConfig.loadPowerWatt() <= 0) {
-                LOGGER.error("Channel {} has invalid load power (<= 0).", channelUID.getId());
-            }
-
-            OnOffType desiredState = getDesiredState(config, availableSurplusW, outConfig, state);
-            OnOffType finalState = getFinalState(channel, outConfig, currentState, desiredState, now);
-
-            updateOutputState(channelUID, finalState, false);
-            LOGGER.debug("Updated status of channel {} to {}", channelUID.getId(), finalState);
-            if (finalState == OnOffType.ON) {
-                break;
-            }
-        }
-        LOGGER.debug("Finished periodic evaluating of energy surplus.");
+    private void updateOutputState(ChannelUID channelUID, OnOffType newState) {
+        updateOutputState(channelUID, newState, false);
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
-        Type savedState = stateHolder.getState(channelUID.getId());
+        Type savedState = stateHolder.getState(channelUID);
         if (savedState != null && !(savedState instanceof OnOffType)) {
             // This should never happen, throwing exception because if this happens, there must be much bigger problems
             // to solve
@@ -287,198 +264,50 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
         if (forceUpdate || newState != previousState) {
             updateState(channelUID, newState);
+            LOGGER.debug("Updated status of channel {} to {}", channelUID.getId(), newState);
         } else {
-            LOGGER.trace("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
+            LOGGER.debug("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
         }
     }
 
-    private void updateAllOutputChannels(OnOffType state, boolean forceUpdate) {
+    protected void updateAllOutputChannels(OnOffType state, boolean forceUpdate) {
         getThing().getChannels().stream().filter(ch -> ch.getChannelTypeUID() != null)
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
                 .forEach(ch -> updateOutputState(ch.getUID(), state, forceUpdate));
         LOGGER.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
     }
 
-    private @Nullable DecimalType getStateInDecimal(ThingParameterItemName item) {
-        Type state = stateHolder.getState(item.getChannelId());
-        switch (state) {
-            case null -> {
-                return null;
+    private boolean verifyStateValueDuringEvaluation(@Nullable InputItemsState state, EnergyManagerConfiguration config) {
+        if (state == null) {
+            LOGGER.warn("Cannot build ManagerState: One or more required input state is null.");
+            if (!wasNotReady) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NOT_YET_READY,
+                        "One or more required input state is still null. It has either not yet received an update or is invalid");
+                wasNotReady = true;
             }
-            case QuantityType<?> quantityType -> {
-                // Assumes base unit (W, %, or unitless for price)
-                return new DecimalType(quantityType.toBigDecimal());
-            }
-            case PercentType percentType -> {
-                return new DecimalType(percentType.toBigDecimal());
-            }
-            case DecimalType decimalType -> {
-                return decimalType;
-            }
-            case OnOffType ignored -> {
-                LOGGER.trace("Cannot convert OnOffType state directly to Decimal for item {}", item);
-                return null;
-            }
-            default -> {
-                // Try parsing from string representation as a fallback
-                try {
-                    return DecimalType.valueOf(state.toString());
-                } catch (NumberFormatException e) {
-                    LOGGER.warn("Cannot parse state '{}' from item {} to DecimalType", state, item);
-                    return null;
-                }
-            }
+            return false;
         }
+
+        if (wasNotReady) {
+            updateStatus(ThingStatus.ONLINE);
+            wasNotReady = false;
+        }
+
+        if (config.toggleOnNegativePrice() && state.electricityPrice() != null
+                && state.electricityPrice().doubleValue() < 0) {
+            LOGGER.info("Price is negative (={}). Signaling ON to all loads.", state.electricityPrice());
+            updateAllOutputChannels(OnOffType.ON, false);
+            return false;
+        }
+
+        if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
+            LOGGER.info("Battery SOC {}% is below minimum {}%. Signaling OFF to all loads.", state.storageSoc().doubleValue(),
+                    state.minStorageSoc().doubleValue());
+            updateAllOutputChannels(OnOffType.OFF, false);
+            return false;
+        }
+
+        return true;
     }
 
-    private DecimalType getMinSocOrDefault(EnergyManagerConfiguration config) {
-        try {
-            Integer fromConfig = Integer.valueOf(config.minStorageSoc());
-            return new DecimalType(fromConfig);
-        } catch (NumberFormatException e) {
-            // do nothing
-        }
-
-        DecimalType fromChannel = this.getStateInDecimal(MIN_STORAGE_SOC);
-        if (fromChannel != null) {
-            return fromChannel;
-        }
-
-        return EnergyManagerBindingConstants.DEFAULT_MIN_STORAGE_SOC;
-    }
-
-    private DecimalType getMaxSocOrDefault(EnergyManagerConfiguration config) {
-        try {
-            Integer fromConfig = Integer.valueOf(config.maxStorageSoc());
-            return new DecimalType(fromConfig);
-        } catch (NumberFormatException e) {
-            // do nothing
-        }
-
-        DecimalType fromChannel = this.getStateInDecimal(MAX_STORAGE_SOC);
-        if (fromChannel != null) {
-            return fromChannel;
-        }
-
-        return EnergyManagerBindingConstants.DEFAULT_MAX_STORAGE_SOC;
-    }
-
-    private OnOffType getDesiredState(EnergyManagerConfiguration config, double availableSurplusW,
-            SurplusOutputParameters outConfig, ManagerState state) {
-        boolean hasSufficientSurplus = availableSurplusW >= (outConfig.loadPowerWatt()
-                + config.minSurplusThresholdWatt());
-        boolean isPriceAcceptable = isIsPriceAcceptable(outConfig, state);
-
-        return (hasSufficientSurplus && isPriceAcceptable) ? OnOffType.ON : OnOffType.OFF;
-    }
-
-    private OnOffType getFinalState(Channel channel, SurplusOutputParameters config, OnOffType currentState,
-            OnOffType desiredState, Instant now) {
-        OnOffType finalState = desiredState;
-
-        if (config.minCooldownMinutes() != null && currentState == OnOffType.OFF && desiredState == OnOffType.ON
-                && stateHolder.getLastDeactivationTime(channel.getUID())
-                        .isAfter(now.minus(config.minCooldownMinutes(), ChronoUnit.MINUTES))) {
-            finalState = OnOffType.OFF;
-        }
-        if (config.minRuntimeMinutes() != null && currentState == OnOffType.ON && desiredState == OnOffType.OFF
-                && stateHolder.getLastActivationTime(channel.getUID())
-                        .isBefore(now.minus(config.minRuntimeMinutes(), ChronoUnit.MINUTES))) {
-            finalState = OnOffType.ON;
-        }
-        return finalState;
-    }
-
-    private boolean isIsPriceAcceptable(SurplusOutputParameters config, ManagerState state) {
-        Integer configPrice = config.maxElectricityPrice();
-        if (configPrice == null) {
-            return true; // No price constraint, always acceptable
-        }
-
-        DecimalType statePrice = state.electricityPrice();
-        if (statePrice == null) {
-            LOGGER.error("Input channel with electricity price contains null value. Cannot evaluate based on price.");
-            // Return true as a fallback
-            return true;
-        }
-
-        return statePrice.doubleValue() <= configPrice;
-    }
-
-    private @Nullable ManagerState buildManagerState(EnergyManagerConfiguration config) {
-        var builder = ManagerState.builder();
-
-        DecimalType production = this.getStateInDecimal(PRODUCTION_POWER);
-        DecimalType gridPower = this.getStateInDecimal(GRID_POWER);
-        DecimalType storageSoc = this.getStateInDecimal(STORAGE_SOC);
-        DecimalType storagePower = this.getStateInDecimal(STORAGE_POWER);
-
-        if (production == null || gridPower == null || storageSoc == null || storagePower == null) {
-            return null;
-        }
-
-        // Required values
-        builder.productionPower(production).gridPower(gridPower).storageSoc(storageSoc).storagePower(storagePower)
-                // optional values with default values or null if not needed
-                .electricityPrice(this.getStateInDecimal(ELECTRICITY_PRICE)).minStorageSoc(getMinSocOrDefault(config))
-                .maxStorageSoc(getMaxSocOrDefault(config));
-
-        return builder.build();
-    }
-
-    private SurplusOutputParameters getOutputChannelConfig(Configuration configuration) {
-        var builder = SurplusOutputParameters.builder();
-        Map<String, Method> builderMethods = getBuilderMethods();
-        for (SurplusOutputParametersEnum property : SurplusOutputParametersEnum.values()) {
-            try {
-                Object prop = configuration.getProperties().get(property.name());
-                if (prop == null) {
-                    LOGGER.error(
-                            "Failed reading channel input property {} from configuration. Property not found in thing configuration.",
-                            property.name());
-                    continue;
-                }
-                builderMethods.get(property.name()).invoke(builder, prop);
-            } catch (Exception e) {
-                LOGGER.error("Failed reading channel input property {} from configuration. {}", property.name(),
-                        e.getMessage());
-            }
-        }
-        return builder.build();
-    }
-
-    private static Map<String, Method> getBuilderMethods() {
-        return Arrays.stream(SurplusOutputParameters.builder().getClass().getDeclaredMethods())
-                .map(it -> Map.entry(it.getName(), it))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    private double getAvailableSurplusWattage(ManagerState state, EnergyManagerConfiguration config) {
-        if (state.productionPower().doubleValue() <= 0) {
-            return 0;
-        }
-        Thing thing = getThing();
-
-        // All grid feed in is considered surplus energy
-        double availableSurplusW = (state.gridPower().doubleValue() < 0) ? -state.gridPower().doubleValue() : 0;
-        // storagePower is negative - Any power going to ESS is a surplus because the minimal SOC is reached
-        // storagePower is positive + If we are using energy from the battery it likely means that we are consuming more
-        // than is available or feeding in from the battery via separate system.
-        availableSurplusW -= state.storagePower().doubleValue();
-
-        // If the ESS is at its maximal user defined capacity and there is some production we are likely in the state of
-        // inverter limiting the available power from the electricity production plant.
-        // We are optimistically assuming that the maximum energy can be generated. If the energy is not actually
-        // available,
-        // the output channel will be switched off in eventually in the next cycles, because it will either consume
-        // from the grid or the battery which leads to lower available surplus energy in the next cycle.
-        if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()) {
-            if (state.productionPower().doubleValue() < config.maxProductionPower()) {
-                availableSurplusW += config.maxProductionPower() - state.productionPower().doubleValue();
-            }
-        }
-
-        LOGGER.debug("Calculated Surplus (Grid Feed-in): {}W", availableSurplusW);
-        return availableSurplusW;
-    }
 }

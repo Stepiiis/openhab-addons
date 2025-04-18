@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.energymanager.internal;
 
+import java.math.BigDecimal;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.thing.ThingTypeUID;
@@ -28,14 +30,14 @@ public class EnergyManagerBindingConstants {
 
     public static final String BINDING_ID = "energymanager";
 
-    public static final ThingTypeUID THING_TYPE_MANAGER = new ThingTypeUID(BINDING_ID, "manager");
+    public static final ThingTypeUID THING_TYPE_MANAGER = new ThingTypeUID(BINDING_ID, "signalizator");
 
     public static final ChannelTypeUID CHANNEL_TYPE_SURPLUS_OUTPUT = new ChannelTypeUID(BINDING_ID, "surplus-output");
 
     public static final DecimalType DEFAULT_MIN_STORAGE_SOC = new DecimalType(30);
     public static final DecimalType DEFAULT_MAX_STORAGE_SOC = new DecimalType(100);
 
-    public static final int MIN_REFRESH_INTERVAL = 10;
+    public static final BigDecimal MIN_REFRESH_INTERVAL = new BigDecimal(10);
 
     // important! Output channel parameter definitions and InputItemNames are in the enums package
 }

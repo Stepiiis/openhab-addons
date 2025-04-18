@@ -45,13 +45,17 @@ public class EnergyManagerStateHolder {
         this.lastDeactivationTime.clear();
     }
 
-    public void saveState(String key, @NotNull Type state) {
-        updateLasts(key, state);
-        states.put(key, state);
+    public void saveState(String channelId, @NotNull Type state) {
+        updateLasts(channelId, state);
+        states.put(channelId, state);
     }
 
-    public @Nullable Type getState(String key) {
-        return states.get(key);
+    public @Nullable Type getState(ChannelUID channelUID){
+        return states.get(channelUID.getId());
+    }
+
+    public @Nullable Type getState(String channelId) {
+        return states.get(channelId);
     }
 
     private void updateLasts(String channelId, Type state) {

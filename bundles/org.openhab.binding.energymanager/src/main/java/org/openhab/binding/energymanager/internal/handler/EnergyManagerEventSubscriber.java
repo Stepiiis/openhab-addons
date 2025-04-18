@@ -54,9 +54,15 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
     @Activate
     public EnergyManagerEventSubscriber() {
         eventConsumers = new ConcurrentHashMap<>();
-        // using virtual threads because of their lightweight nature
-        executorService = Executors.newVirtualThreadPerTaskExecutor();
-        LOGGER.trace("Event manager Initialized");
+
+        Runtime.Version version = Runtime.version();
+        if (version.feature() >= 21) {
+            // using virtual threads if available because of their lightweight nature
+            executorService = Executors.newVirtualThreadPerTaskExecutor();
+        } else {
+            executorService = Executors.newCachedThreadPool();
+        }
+        LOGGER.debug("Event manager Initialized");
     }
 
     @Override
@@ -112,6 +118,6 @@ public class EnergyManagerEventSubscriber extends AbstractItemEventSubscriber {
     @Deactivate
     public void deactivate() {
         executorService.shutdown();
-        LOGGER.trace("Event manager disposed");
+        LOGGER.debug("Event manager disposed");
     }
 }
