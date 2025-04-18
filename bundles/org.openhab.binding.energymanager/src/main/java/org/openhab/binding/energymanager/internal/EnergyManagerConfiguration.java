@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.energymanager.internal;
 
+import java.math.BigDecimal;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
@@ -22,11 +24,11 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public record EnergyManagerConfiguration(
         // required settings
-        int refreshInterval, int maxProductionPower,
+        BigDecimal refreshInterval, BigDecimal maxProductionPower,
         // required settings or item names
         String minStorageSoc, String maxStorageSoc,
         // required names of associated items
         String productionPower, String gridPower, String storageSoc, String storagePower, String electricityPrice,
         // optional with default values
-        int minSurplusThresholdWatt, int initialDelay, boolean toggleOnNegativePrice) {
+        BigDecimal minSurplusThresholdWatt, BigDecimal initialDelay, Boolean toggleOnNegativePrice) {
 }

@@ -16,7 +16,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
- * The {@link SurplusOutputParameters} record represents user specified parameters of surplusOutput channels.
+ * The {@link SurplusOutputParameters} record represents user specified parameters of one surplusOutput channel.
  * important - Field names have to be the same as output channel property names inside thing-types.xml
  *
  * @author <Štěpán Beran> - Initial contribution

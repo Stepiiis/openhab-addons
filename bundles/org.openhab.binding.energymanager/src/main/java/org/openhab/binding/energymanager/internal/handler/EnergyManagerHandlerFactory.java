@@ -18,6 +18,8 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
+import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
@@ -40,10 +42,15 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_MANAGER);
 
     private final EnergyManagerEventSubscriber eventsSubscriber;
+    private final SurplusDecisionEngine surplusDecisionEngine;
+    private final ConfigUtilService configUtilService;
 
     @Activate
-    public EnergyManagerHandlerFactory(@Reference EnergyManagerEventSubscriber eventsSubscriber) {
+    public EnergyManagerHandlerFactory(@Reference EnergyManagerEventSubscriber eventsSubscriber,
+            @Reference SurplusDecisionEngine surplusDecisionEngine, @Reference ConfigUtilService configutilService) {
         this.eventsSubscriber = eventsSubscriber;
+        this.surplusDecisionEngine = surplusDecisionEngine;
+        this.configUtilService = configutilService;
     }
 
     @Override
@@ -56,7 +63,7 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (THING_TYPE_MANAGER.equals(thingTypeUID)) {
-            return new EnergyManagerHandler(thing, eventsSubscriber);
+            return new EnergyManagerHandler(thing, eventsSubscriber, surplusDecisionEngine, configUtilService);
         }
 
         return null;
