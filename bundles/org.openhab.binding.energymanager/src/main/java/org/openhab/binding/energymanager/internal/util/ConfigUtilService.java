@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.energymanager.internal.util;
 
+import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.MIN_STORAGE_SOC;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -36,11 +38,8 @@ import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.types.Type;
-import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.MIN_STORAGE_SOC;
 
 /**
  * The {@link ConfigUtilService} provides utility methods for configuration related matters.
@@ -52,7 +51,7 @@ public class ConfigUtilService {
 
     private final EnergyManagerStateHolder stateHolder;
 
-    public ConfigUtilService(EnergyManagerStateHolder stateHolder){
+    public ConfigUtilService(EnergyManagerStateHolder stateHolder) {
         this.stateHolder = stateHolder;
     }
 
@@ -186,5 +185,4 @@ public class ConfigUtilService {
 
         return defaultValue;
     }
-
 }

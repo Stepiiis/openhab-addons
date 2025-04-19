@@ -12,23 +12,28 @@
  */
 package org.openhab.binding.energymanager.internal.handler;
 
-import org.eclipse.jdt.annotation.NonNull;
+import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
+import static org.openhab.core.types.RefreshType.REFRESH;
+
+import java.util.*;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
-import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
 import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
 import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.items.events.ItemStateEvent;
-import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
-import org.openhab.core.library.types.PercentType;
-import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
@@ -39,16 +44,6 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
-import static org.openhab.core.types.RefreshType.REFRESH;
 
 /**
  * The {@link EnergyManagerHandler} is responsible for handling commands, which are
@@ -69,8 +64,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
     private final ConfigUtilService configUtilService;
     private final EnergyBalancingEngine energyBalancingEngine;
 
-    EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventSubscriber,
-                         ConfigUtilService configUtilService, EnergyManagerStateHolder stateHolder, EnergyBalancingEngine energyBalancingEngine) {
+    EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventSubscriber, ConfigUtilService configUtilService,
+            EnergyManagerStateHolder stateHolder, EnergyBalancingEngine energyBalancingEngine) {
         super(thing);
         this.LOGGER = LoggerFactory.getLogger(EnergyManagerHandler.class);
 
@@ -197,7 +192,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private void startEvaluationJob(EnergyManagerConfiguration config) {
+    void startEvaluationJob(EnergyManagerConfiguration config) {
         updateAllOutputChannels(OnOffType.OFF, true);
         if (evaluationJob == null || evaluationJob.isCancelled()) {
             if (config.refreshInterval().longValue() <= 0) {
@@ -205,12 +200,10 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 return;
             }
 
-            this.evaluationJob = scheduler.scheduleWithFixedDelay(() ->
-                            energyBalancingEngine.evaluateEnergyBalance(config,
-                                    getThing(),
-                                    getOutputChannels(),
-                                    (inputitemsState) -> verifyStateValueDuringEvaluation(inputitemsState, config),
-                                    this::updateOutputState),
+            this.evaluationJob = scheduler.scheduleWithFixedDelay(
+                    () -> energyBalancingEngine.evaluateEnergyBalance(config, getThing(), getOutputChannels(),
+                            (inputitemsState) -> verifyStateValueDuringEvaluation(inputitemsState, config),
+                            this::updateOutputState),
                     config.initialDelay().longValue(), config.refreshInterval().longValue(), TimeUnit.SECONDS);
             LOGGER.info("Scheduling periodic evaluation job to start in {} seconds for {} running every {} seconds",
                     config.initialDelay(), getThing().getUID(), config.refreshInterval());
@@ -231,16 +224,13 @@ public class EnergyManagerHandler extends BaseThingHandler {
         return evaluationJob != null && Future.State.RUNNING.equals(evaluationJob.state());
     }
 
-
     List<Map.Entry<ChannelUID, SurplusOutputParameters>> getOutputChannels() {
         return getThing().getChannels().stream()
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
                 .flatMap(ch -> {
                     var opt = configUtilService.parseSurplusOutputParameters(ch.getConfiguration());
                     if (opt != null) {
-                        @NonNull
-                        SurplusOutputParameters value = opt;
-                        return Stream.of(Map.entry(ch.getUID(), value));
+                        return Stream.of(Map.entry(ch.getUID(), opt));
                     } else {
                         LOGGER.error("Could not read channel {} parameters, ignoring it.", ch.getUID());
                         return Stream.empty();
@@ -277,7 +267,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
         LOGGER.debug("Set all output signals to {} (Forced: {})", state, forceUpdate);
     }
 
-    private boolean verifyStateValueDuringEvaluation(@Nullable InputItemsState state, EnergyManagerConfiguration config) {
+    private boolean verifyStateValueDuringEvaluation(@Nullable InputItemsState state,
+            EnergyManagerConfiguration config) {
         if (state == null) {
             LOGGER.warn("Cannot build ManagerState: One or more required input state is null.");
             if (!wasNotReady) {
@@ -301,13 +292,12 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
 
         if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
-            LOGGER.info("Battery SOC {}% is below minimum {}%. Signaling OFF to all loads.", state.storageSoc().doubleValue(),
-                    state.minStorageSoc().doubleValue());
+            LOGGER.info("Battery SOC {}% is below minimum {}%. Signaling OFF to all loads.",
+                    state.storageSoc().doubleValue(), state.minStorageSoc().doubleValue());
             updateAllOutputChannels(OnOffType.OFF, false);
             return false;
         }
 
         return true;
     }
-
 }

@@ -23,8 +23,9 @@ import org.eclipse.jdt.annotation.Nullable;
  *
  */
 @NonNullByDefault
-public record SurplusOutputParameters(int priority, int loadPower, @Nullable Integer switchingPower, @Nullable Integer minRuntimeMinutes,
-                                      @Nullable Integer minCooldownMinutes, @Nullable Integer maxElectricityPrice) {
+public record SurplusOutputParameters(int priority, int loadPower, @Nullable Integer switchingPower,
+        @Nullable Integer minRuntimeMinutes, @Nullable Integer minCooldownMinutes,
+        @Nullable Integer maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
         return new SurplusOutputParametersBuilder();
@@ -50,7 +51,6 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
             this.loadPower = loadPower;
             return this;
         }
-
 
         public SurplusOutputParametersBuilder switchingPower(@Nullable Integer switchingPower) {
             this.switchingPower = switchingPower;
@@ -78,8 +78,8 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
         }
 
         public SurplusOutputParameters build() {
-            return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes, minCooldownMinutes,
-                    maxElectricityPrice);
+            return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes,
+                    minCooldownMinutes, maxElectricityPrice);
         }
     }
 }

@@ -35,31 +35,30 @@ import org.slf4j.LoggerFactory;
 public class SurplusDecisionEngine {
     private final Logger LOGGER = LoggerFactory.getLogger(SurplusDecisionEngine.class);
 
-    public OnOffType determineDesiredState(SurplusOutputParameters channelParameters,
-                                           InputItemsState state, double availableSurplusW, OnOffType currentState, Instant lastActivation,
-                                           Instant lastDeactivation, Instant now) {
+    public OnOffType determineDesiredState(SurplusOutputParameters channelParameters, InputItemsState state,
+            double availableSurplusW, OnOffType currentState, Instant lastActivation, Instant lastDeactivation,
+            Instant now) {
         boolean hasSurplus;
 
-        long switchingPower = channelParameters.switchingPower() == null
-                ? channelParameters.loadPower()
+        long switchingPower = channelParameters.switchingPower() == null ? channelParameters.loadPower()
                 : channelParameters.switchingPower();
         if (OnOffType.OFF.equals(currentState)) {
             hasSurplus = availableSurplusW >= switchingPower;
         } else {
             if (channelParameters.loadPower() < switchingPower) {
-                LOGGER.error("Load power of given channel is lower than it's switching power. This is undefined behaviour.");
+                LOGGER.error(
+                        "Load power of given channel is lower than it's switching power. This is undefined behaviour.");
             }
-            if (availableSurplusW < 0
-                    && -availableSurplusW >= channelParameters.loadPower() - switchingPower) {
+            if (availableSurplusW < 0 && -availableSurplusW >= channelParameters.loadPower() - switchingPower) {
                 hasSurplus = false;
             } else {
                 return currentState;
             }
         }
 
-        LOGGER.debug(
-                "There {} enough surplus for channel. availableSurplus={}, loadPower={}, switchingPower={}",
-                hasSurplus ? "is" : "is not", availableSurplusW, channelParameters.loadPower(), channelParameters.switchingPower());
+        LOGGER.debug("There {} enough surplus for channel. availableSurplus={}, loadPower={}, switchingPower={}",
+                hasSurplus ? "is" : "is not", availableSurplusW, channelParameters.loadPower(),
+                channelParameters.switchingPower());
 
         boolean isPriceOk = isPriceAcceptable(channelParameters, state);
         LOGGER.debug("Price {} acceptable for channel. electricityPrice={}, maxElectricityPrice={}",
@@ -72,7 +71,7 @@ public class SurplusDecisionEngine {
     }
 
     private OnOffType applyCooldownAndRuntimeConstraints(SurplusOutputParameters config, OnOffType currentState,
-                                                         OnOffType desiredState, Instant lastActivation, Instant lastDeactivation, Instant now) {
+            OnOffType desiredState, Instant lastActivation, Instant lastDeactivation, Instant now) {
         OnOffType result = desiredState;
 
         if (config.minCooldownMinutes() != null && currentState == OnOffType.OFF && desiredState == OnOffType.ON
@@ -140,7 +139,8 @@ public class SurplusDecisionEngine {
      * available, the output channel will be switched off eventually in the next cycles, because it will either
      * consume from the grid or the battery which leads to lower available surplus energy in the next cycle.
      */
-    private double getPotentialSurplusDueToFullESSandInverterLimitation(InputItemsState state, EnergyManagerConfiguration config) {
+    private double getPotentialSurplusDueToFullESSandInverterLimitation(InputItemsState state,
+            EnergyManagerConfiguration config) {
         if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()) {
             if (DecimalType.ZERO.equals(state.gridPower())
                     // some power going to the ESS is allowed, but none from it

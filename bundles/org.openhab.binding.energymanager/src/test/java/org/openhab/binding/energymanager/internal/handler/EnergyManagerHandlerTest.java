@@ -30,9 +30,11 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
+import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
 import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
 import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.thing.Thing;
 
 /**
  * The {@link EnergyManagerHandlerTest} tests the proper functioning of the EnergyManager handler.
@@ -55,6 +57,12 @@ class EnergyManagerHandlerTest {
     @Spy
     SurplusDecisionEngine surplusDecisionEngine;
 
+    @Mock
+    EnergyBalancingEngine energyBalancingEngine;
+
+    @Mock
+    Thing thing;
+
     private final String MIN_STORAGE_SOC = "min_storage_soc";
     private final String MAX_STORAGE_SOC = "max_storage_soc";
     private final String PROD_PWR = "prod_pwr";
@@ -65,7 +73,7 @@ class EnergyManagerHandlerTest {
 
     EnergyManagerConfiguration config = new EnergyManagerConfiguration(new BigDecimal(30), new BigDecimal(10_000),
             MIN_STORAGE_SOC, MAX_STORAGE_SOC, PROD_PWR, GRID_POWER, STORAGE_SOC, STORAGE_POWER, ELECTRICITY_PRICE,
-            new BigDecimal(0), new BigDecimal(0), true);
+            new BigDecimal(0), new BigDecimal(0), true, true);
 
     @BeforeEach()
     void init() {
@@ -81,12 +89,13 @@ class EnergyManagerHandlerTest {
 
     @Test
     void testReinitialization() {
-        doAnswer(invocation -> config).when(managerHandler).loadAndValidateConfig();
+        doReturn(config).when(managerHandler).loadAndValidateConfig();
+        doReturn(thing).when(managerHandler).getThing();
         managerHandler.reinitialize();
 
         verify(eventSubscriber, times(1)).unregisterEventsFor(any());
+        verify(managerHandler, times(1)).startEvaluationJob(eq(config));
         verify(managerHandler, times(1)).updateAllOutputChannels(eq(OnOffType.OFF), eq(true));
-        assertTrue(managerHandler.isEvaluationJobRunning());
         verify(managerHandler, times(1)).registerEvents(eq(config));
     }
 
@@ -115,7 +124,7 @@ class EnergyManagerHandlerTest {
         var newConfig = new EnergyManagerConfiguration(config.refreshInterval(), config.maxProductionPower(), "30",
                 "30", config.productionPower(), config.gridPower(), config.storageSoc(), config.storagePower(),
                 config.electricityPrice(), config.minAvailableSurplusEnergy(), config.initialDelay(),
-                config.toggleOnNegativePrice());
+                config.toggleOnNegativePrice(), config.enableInverterLimitingHeuristic());
         managerHandler.registerEvents(newConfig);
         verify(eventSubscriber).registerEventsFor(any(), eq(itemMapping), any());
     }

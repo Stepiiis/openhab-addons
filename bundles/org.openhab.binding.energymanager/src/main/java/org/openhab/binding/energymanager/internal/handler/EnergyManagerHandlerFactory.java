@@ -45,14 +45,12 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
 
     private final EnergyManagerEventSubscriber eventsSubscriber;
     private final SurplusDecisionEngine surplusDecisionEngine;
-    private final ConfigUtilService configUtilService;
 
     @Activate
     public EnergyManagerHandlerFactory(@Reference EnergyManagerEventSubscriber eventsSubscriber,
-            @Reference SurplusDecisionEngine surplusDecisionEngine, @Reference ConfigUtilService configutilService) {
+            @Reference SurplusDecisionEngine surplusDecisionEngine) {
         this.eventsSubscriber = eventsSubscriber;
         this.surplusDecisionEngine = surplusDecisionEngine;
-        this.configUtilService = configutilService;
     }
 
     @Override
@@ -67,8 +65,10 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
         if (THING_TYPE_MANAGER.equals(thingTypeUID)) {
             EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
             ConfigUtilService configUtilService = new ConfigUtilService(stateHolder);
-            EnergyBalancingEngine energyBalancingEngine = new EnergyBalancingEngine(surplusDecisionEngine, configUtilService, stateHolder);
-            return new EnergyManagerHandler(thing, eventsSubscriber, configUtilService, stateHolder, energyBalancingEngine);
+            EnergyBalancingEngine energyBalancingEngine = new EnergyBalancingEngine(surplusDecisionEngine,
+                    configUtilService, stateHolder);
+            return new EnergyManagerHandler(thing, eventsSubscriber, configUtilService, stateHolder,
+                    energyBalancingEngine);
         }
 
         return null;

@@ -50,7 +50,7 @@ public class EnergyManagerStateHolder {
         states.put(channelId, state);
     }
 
-    public @Nullable Type getState(ChannelUID channelUID){
+    public @Nullable Type getState(ChannelUID channelUID) {
         return states.get(channelUID.getId());
     }
 

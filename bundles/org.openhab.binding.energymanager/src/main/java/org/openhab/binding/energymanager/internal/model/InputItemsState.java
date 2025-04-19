@@ -44,6 +44,17 @@ public record InputItemsState(DecimalType productionPower, DecimalType gridPower
             // Private constructor to prevent direct instantiation
         }
 
+        public InputItemsStateBuilder from(InputItemsState state) {
+            this.productionPower = state.productionPower();
+            this.gridPower = state.gridPower();
+            this.storageSoc = state.storageSoc();
+            this.storagePower = state.storagePower();
+            this.minStorageSoc = state.minStorageSoc();
+            this.maxStorageSoc = state.maxStorageSoc();
+            this.electricityPrice = state.electricityPrice();
+            return this;
+        }
+
         public InputItemsStateBuilder productionPower(DecimalType productionPower) {
             this.productionPower = productionPower;
             return this;

@@ -76,7 +76,8 @@
 				<label>Minimum surplus energy threshold (W)</label>
 				<description>
 					This value is subtracted from calculated surplus.
-					Use this to specify amount of energy *always* available for e.g. ESS or grid feed in.
+					Use this to specify amount of energy *always*
+					available for e.g. ESS or grid feed in.
 				</description>
 				<default>0</default>
 			</parameter>
@@ -97,7 +98,8 @@
 				<label>Enable heuristic to calculate surplus</label>
 				<description>
 					Experimental feature which enables calculation of surplus energy once the maximum SOC of the ESS
-					is reached. If there is some production and there is no energy going from or to the grid, it
+					is
+					reached. If there is some production and there is no energy going from or to the grid, it
 				</description>
 				<default>false</default>
 			</parameter>
@@ -115,7 +117,8 @@
 				<label>Load priority</label>
 				<description>
 					Load priority (1 = highest). Higher priority loads are considered first.
-					Duplicate priorities lead to undefined order.
+					Duplicate priorities lead to
+					undefined order.
 				</description>
 				<default>1</default>
 			</parameter>
@@ -128,10 +131,13 @@
 				<label>Switching power (W)</label>
 				<description>
 					The amount of available surplus energy at which the load should be turned ON.
-					Influences the amount of energy allowed to be drawn from the ESS or the grid which is
-					equal to the difference between switchingPower and loadPower.
+					Influences the amount of
+					energy allowed to be drawn from the ESS or the grid which is
+					equal to the difference between switchingPower and
+					loadPower.
 					Value higher than loadPower leads to undefined behaviour.
-					If left empty, the loadPower is used as switchingPower.
+					If left empty, the loadPower is used as
+					switchingPower.
 				</description>
 				<default>1000</default>
 			</parameter>

@@ -32,7 +32,7 @@ public enum SurplusOutputParametersEnum {
     LOAD_SWITCHING_POWER("switchingPower", false),
     MIN_RUNTIME_MINUTES("minRuntimeMinutes", false),
     MIN_COOLDOWN_MINUTES("minCooldownMinutes", false),
-    ELECTRICITY_PRICE("maxElectricityPrice", false),;
+    ELECTRICITY_PRICE("maxElectricityPrice", false);
 
     private final String propertyName;
     private final boolean required;
