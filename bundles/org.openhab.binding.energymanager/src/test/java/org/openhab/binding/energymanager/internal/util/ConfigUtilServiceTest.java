@@ -23,10 +23,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerInputStateHolder;
 import org.openhab.core.config.core.Configuration;
 
 /**
@@ -35,13 +39,17 @@ import org.openhab.core.config.core.Configuration;
  *
  * @author <Štěpán Beran> - Initial contribution
  */
+@ExtendWith(MockitoExtension.class)
 public class ConfigUtilServiceTest {
 
-    EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
+    @Spy
+    EnergyManagerInputStateHolder inputStateHolder;
 
-    ConfigUtilService configUtilService = new ConfigUtilService(stateHolder);
+    @Spy
+    @InjectMocks
+    ConfigUtilService configUtilService;
 
-    // Enum propertyNames match record fields
+    // Enum SurplusOutputParametersEnum match record fields
     @Test
     void eachEnumPropertyMatchesRecordField() {
         for (SurplusOutputParametersEnum enumValue : SurplusOutputParametersEnum.values()) {
@@ -55,7 +63,7 @@ public class ConfigUtilServiceTest {
         }
     }
 
-    // Enum propertyNames have corresponding builder methods
+    // Enum SurplusOutputParametersEnum have corresponding builder methods
     @Test
     void eachEnumPropertyHasBuilderMethod() {
         for (SurplusOutputParametersEnum enumValue : SurplusOutputParametersEnum.values()) {
@@ -91,7 +99,7 @@ public class ConfigUtilServiceTest {
         }
     }
 
-    // Parsing with all required properties (current code will fail)
+    // Parsing with all required properties
     @Test
     void parseSurplusOutputParameters_ValidConfig_ReturnsParameters() {
         Map<String, Object> properties = new HashMap<>();

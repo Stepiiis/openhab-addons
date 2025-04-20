@@ -31,7 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerOutputStateHolder;
 import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
@@ -57,7 +57,7 @@ class EnergyBalancingEngineTest {
     SurplusDecisionEngine surplusDecisionEngine;
 
     @Mock
-    EnergyManagerStateHolder stateHolder;
+    EnergyManagerOutputStateHolder outputStateHolder;
 
     @Mock
     BiConsumer<ChannelUID, OnOffType> updateStateFunction;
@@ -105,7 +105,7 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.storagePower(new DecimalType(-2000)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -117,8 +117,8 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.storagePower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -132,7 +132,7 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(1000)).storagePower(new DecimalType(0)).build())
                 .when(energyBalancingEngine).buildEnergyState(any());
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -145,8 +145,8 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
-        doReturn(OnOffType.OFF).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -159,8 +159,8 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(700)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
-        doReturn(OnOffType.OFF).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invokes
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -174,8 +174,8 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.OFF).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
-        doReturn(OnOffType.OFF).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invokes
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -215,8 +215,8 @@ class EnergyBalancingEngineTest {
         // setup subsequent call
         doReturn(stateBuilder.productionPower(new DecimalType(5000)).storagePower(new DecimalType(2000)).build())
                 .when(energyBalancingEngine).buildEnergyState(any());
-        doReturn(OnOffType.OFF).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
-        doReturn(OnOffType.ON).when(stateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
+        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invokes
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);

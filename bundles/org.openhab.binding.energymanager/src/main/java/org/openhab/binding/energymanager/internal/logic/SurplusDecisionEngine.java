@@ -38,6 +38,12 @@ public class SurplusDecisionEngine {
     public OnOffType determineDesiredState(SurplusOutputParameters channelParameters, InputItemsState state,
             double availableSurplusW, OnOffType currentState, Instant lastActivation, Instant lastDeactivation,
             Instant now) {
+
+        // Not really necessary, because negative price is handled elsewhere, but used for completeness
+        if (state.electricityPrice() != null && state.electricityPrice().longValue() < 0) {
+            return OnOffType.ON;
+        }
+
         boolean hasSurplus;
 
         long switchingPower = channelParameters.switchingPower() == null ? channelParameters.loadPower()

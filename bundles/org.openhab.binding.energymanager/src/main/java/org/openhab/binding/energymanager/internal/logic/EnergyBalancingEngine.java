@@ -29,7 +29,7 @@ import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerOutputStateHolder;
 import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
@@ -48,15 +48,15 @@ public class EnergyBalancingEngine {
     private final Logger LOGGER;
 
     private final SurplusDecisionEngine surplusDecisionEngine;
-    private final EnergyManagerStateHolder stateHolder;
+    private final EnergyManagerOutputStateHolder outputStateHolder;
     private final ConfigUtilService configUtilService;
 
     public EnergyBalancingEngine(SurplusDecisionEngine surplusDecisionEngine, ConfigUtilService configUtilService,
-            EnergyManagerStateHolder stateHolder) {
+            EnergyManagerOutputStateHolder outputStateHolder) {
         this.LOGGER = LoggerFactory.getLogger(EnergyBalancingEngine.class);
         this.surplusDecisionEngine = surplusDecisionEngine;
         this.configUtilService = configUtilService;
-        this.stateHolder = stateHolder;
+        this.outputStateHolder = outputStateHolder;
     }
 
     /**
@@ -109,14 +109,14 @@ public class EnergyBalancingEngine {
             SurplusOutputParameters channelParameters = channel.getValue();
 
             // With default state of channels if it was never saved being OFF
-            OnOffType currentState = (OnOffType) Objects.requireNonNullElse(stateHolder.getState(channelUID),
+            OnOffType currentState = (OnOffType) Objects.requireNonNullElse(outputStateHolder.getState(channelUID),
                     OnOffType.OFF);
             if (loadShedding && OnOffType.OFF.equals(currentState)) {
                 continue;
             }
 
-            Instant lastActivationTime = stateHolder.getLastActivationTime(channelUID);
-            Instant lastDeactivationTime = stateHolder.getLastDeactivationTime(channelUID);
+            Instant lastActivationTime = outputStateHolder.getLastActivationTime(channelUID);
+            Instant lastDeactivationTime = outputStateHolder.getLastDeactivationTime(channelUID);
             LOGGER.debug("Last activation of channel {} was {}", channelUID, lastActivationTime);
             LOGGER.debug("Last deactivation of channel {} was {}", channelUID, lastDeactivationTime);
             OnOffType desiredState = surplusDecisionEngine.determineDesiredState(channelParameters, state,
@@ -136,10 +136,10 @@ public class EnergyBalancingEngine {
     InputItemsState buildEnergyState(EnergyManagerConfiguration config) {
         var builder = InputItemsState.builder();
 
-        DecimalType production = configUtilService.getStateInDecimal(PRODUCTION_POWER);
-        DecimalType gridPower = configUtilService.getStateInDecimal(GRID_POWER);
-        DecimalType storageSoc = configUtilService.getStateInDecimal(STORAGE_SOC);
-        DecimalType storagePower = configUtilService.getStateInDecimal(STORAGE_POWER);
+        DecimalType production = configUtilService.getInputStateInDecimal(PRODUCTION_POWER);
+        DecimalType gridPower = configUtilService.getInputStateInDecimal(GRID_POWER);
+        DecimalType storageSoc = configUtilService.getInputStateInDecimal(STORAGE_SOC);
+        DecimalType storagePower = configUtilService.getInputStateInDecimal(STORAGE_POWER);
 
         if (production == null || gridPower == null || storageSoc == null || storagePower == null) {
             LOGGER.error("production={} gridPower={} storageSoc={} storagePower={}", production, gridPower, storageSoc,
@@ -150,7 +150,7 @@ public class EnergyBalancingEngine {
         // Required values
         builder.productionPower(production).gridPower(gridPower).storageSoc(storageSoc).storagePower(storagePower)
                 // optional values with default values or null if not needed
-                .electricityPrice(configUtilService.getStateInDecimal(ELECTRICITY_PRICE))
+                .electricityPrice(configUtilService.getInputStateInDecimal(ELECTRICITY_PRICE))
                 .minStorageSoc(configUtilService.getMinSocOrDefault(config))
                 .maxStorageSoc(configUtilService.getMaxSocOrDefault(config));
 

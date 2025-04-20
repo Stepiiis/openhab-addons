@@ -28,16 +28,16 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
         @Nullable Integer maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
-        return new SurplusOutputParametersBuilder();
+        return SurplusOutputParametersBuilder.create();
     }
 
     public static class SurplusOutputParametersBuilder {
-        private int priority;
-        private int loadPower;
-        private @Nullable Integer switchingPower;
-        private @Nullable Integer minRuntimeMinutes;
-        private @Nullable Integer minCooldownMinutes;
-        private @Nullable Integer maxElectricityPrice;
+        private @Nullable Integer priority = null;
+        private @Nullable Integer loadPower = null;
+        private @Nullable Integer switchingPower = null;
+        private @Nullable Integer minRuntimeMinutes = null;
+        private @Nullable Integer minCooldownMinutes = null;
+        private @Nullable Integer maxElectricityPrice = null;
 
         private SurplusOutputParametersBuilder() {
             // Private constructor to prevent direct instantiation
@@ -78,6 +78,9 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
         }
 
         public SurplusOutputParameters build() {
+            if (priority == null || loadPower == null) {
+                throw new IllegalStateException("Priority or loadPower can never be null");
+            }
             return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes,
                     minCooldownMinutes, maxElectricityPrice);
         }

@@ -30,7 +30,8 @@ import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
 import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerInputStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerOutputStateHolder;
 import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.library.types.OnOffType;
@@ -55,7 +56,8 @@ import org.slf4j.LoggerFactory;
 public class EnergyManagerHandler extends BaseThingHandler {
     private final Logger LOGGER;
 
-    private final EnergyManagerStateHolder stateHolder;
+    private final EnergyManagerOutputStateHolder outputStateHolder;
+    private final EnergyManagerInputStateHolder inputStateHolder;
     private @Nullable ScheduledFuture<?> evaluationJob;
 
     private volatile boolean wasNotReady = false;
@@ -65,11 +67,13 @@ public class EnergyManagerHandler extends BaseThingHandler {
     private final EnergyBalancingEngine energyBalancingEngine;
 
     EnergyManagerHandler(Thing thing, EnergyManagerEventSubscriber eventSubscriber, ConfigUtilService configUtilService,
-            EnergyManagerStateHolder stateHolder, EnergyBalancingEngine energyBalancingEngine) {
+            EnergyManagerOutputStateHolder outputStateHolder, EnergyManagerInputStateHolder inputStateHolder,
+            EnergyBalancingEngine energyBalancingEngine) {
         super(thing);
         this.LOGGER = LoggerFactory.getLogger(EnergyManagerHandler.class);
 
-        this.stateHolder = stateHolder;
+        this.inputStateHolder = inputStateHolder;
+        this.outputStateHolder = outputStateHolder;
         this.configUtilService = configUtilService;
         this.eventSubscriber = eventSubscriber;
         this.energyBalancingEngine = energyBalancingEngine;
@@ -85,6 +89,9 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     protected boolean reinitialize() {
         eventSubscriber.unregisterEventsFor(thing.getUID());
+
+        inputStateHolder.clear();
+        outputStateHolder.clear();
 
         EnergyManagerConfiguration config = loadAndValidateConfig();
         if (config == null) {
@@ -118,7 +125,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 }
             }
         }
-        eventSubscriber.registerEventsFor(thing.getUID(), itemMapping, this::handleItemUpdate);
+        eventSubscriber.registerEventsFor(thing.getUID(), itemMapping, this::handleItemStateUpdate);
     }
 
     protected @Nullable EnergyManagerConfiguration loadAndValidateConfig() {
@@ -142,13 +149,14 @@ public class EnergyManagerHandler extends BaseThingHandler {
         LOGGER.debug("Disposing Energy Manager Handler for {}", getThing().getUID());
         stopEvaluationJob();
 
-        stateHolder.clear();
+        outputStateHolder.clear();
+        inputStateHolder.clear();
         updateStatus(ThingStatus.OFFLINE);
         super.dispose();
     }
 
     @Override
-    public synchronized void handleCommand(ChannelUID channelUID, Command command) {
+    public void handleCommand(ChannelUID channelUID, Command command) {
         if (getThing().getChannels().stream()
                 .filter(ch -> EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT.equals(ch.getChannelTypeUID()))
                 .noneMatch(it -> channelUID.equals(it.getUID()))) {
@@ -161,18 +169,18 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private void handleItemUpdate(ThingParameterItemName item, ItemStateEvent itemEvent) {
+    void handleItemStateUpdate(ThingParameterItemName item, ItemStateEvent itemEvent) {
         // todo test save and retrieve
         LOGGER.trace("Received value '{}' of internal type '{}' from user item '{}'", itemEvent.getItemState(),
                 item.getChannelId(), itemEvent.getItemName());
         // todo validate the types of received value
-        stateHolder.saveState(item.getChannelId(), itemEvent.getItemState());
+        inputStateHolder.saveState(item.getChannelId(), itemEvent.getItemState());
     }
 
     @Override
     protected void updateState(ChannelUID channelUID, State state) {
         super.updateState(channelUID, state);
-        stateHolder.saveState(channelUID.getId(), state);
+        outputStateHolder.saveState(channelUID.getId(), state, true);
     }
 
     @Override
@@ -212,7 +220,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
     }
 
-    private void stopEvaluationJob() {
+    void stopEvaluationJob() {
         if (evaluationJob != null && !evaluationJob.isCancelled()) {
             evaluationJob.cancel(true);
             evaluationJob = null;
@@ -243,7 +251,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
-        Type savedState = stateHolder.getState(channelUID);
+        Type savedState = outputStateHolder.getState(channelUID);
         if (savedState != null && !(savedState instanceof OnOffType)) {
             // This should never happen, throwing exception because if this happens, there must be much bigger problems
             // to solve

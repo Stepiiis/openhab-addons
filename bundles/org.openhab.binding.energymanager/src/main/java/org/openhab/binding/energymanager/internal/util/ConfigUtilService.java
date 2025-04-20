@@ -31,7 +31,7 @@ import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
 import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerInputStateHolder;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
@@ -49,10 +49,10 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class ConfigUtilService {
 
-    private final EnergyManagerStateHolder stateHolder;
+    private final EnergyManagerInputStateHolder inputStateHolder;
 
-    public ConfigUtilService(EnergyManagerStateHolder stateHolder) {
-        this.stateHolder = stateHolder;
+    public ConfigUtilService(EnergyManagerInputStateHolder inputStateHolder) {
+        this.inputStateHolder = inputStateHolder;
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConfigUtilService.class);
@@ -133,8 +133,8 @@ public class ConfigUtilService {
     }
 
     @Nullable
-    public DecimalType getStateInDecimal(ThingParameterItemName item) {
-        Type state = stateHolder.getState(item.getChannelId());
+    public DecimalType getInputStateInDecimal(ThingParameterItemName item) {
+        Type state = inputStateHolder.getState(item.getChannelId());
 
         if (state == null) {
             return null;
@@ -177,7 +177,7 @@ public class ConfigUtilService {
             // do nothing
         }
 
-        DecimalType fromChannel = this.getStateInDecimal(MIN_STORAGE_SOC);
+        DecimalType fromChannel = this.getInputStateInDecimal(MIN_STORAGE_SOC);
         LOGGER.debug("Converted value from config is {}", fromChannel != null ? fromChannel : defaultValue);
         if (fromChannel != null) {
             return fromChannel;

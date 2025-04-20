@@ -55,11 +55,10 @@ class SurplusDecisionEngineTest {
         return builder.build();
     }
 
-    // Helper method to create SurplusOutputParameters
     private SurplusOutputParameters buildOutputParameters(int loadPower, int switchingPower,
             @Nullable Integer maxElectricityPrice, @Nullable Integer minCooldownMinutes,
             @Nullable Integer minRuntimeMinutes) {
-        SurplusOutputParameters.SurplusOutputParametersBuilder builder = SurplusOutputParameters.builder()
+        SurplusOutputParameters.SurplusOutputParametersBuilder builder = SurplusOutputParameters.builder().priority(1)
                 .loadPower(loadPower).switchingPower(switchingPower);
 
         if (maxElectricityPrice != null)
@@ -72,14 +71,13 @@ class SurplusDecisionEngineTest {
         return builder.build();
     }
 
-    // Helper method to create EnergyManagerConfiguration
     private EnergyManagerConfiguration buildConfig(boolean enableHeuristic, @Nullable Integer maxProductionPower,
-            @Nullable Integer minAvailableSurplusEnergy) {
+            @Nullable Integer minAvailableSurplusEnergy, @Nullable Integer maxStorageSoc) {
         return new EnergyManagerConfiguration(BigDecimal.valueOf(30), // refreshInterval (30 seconds)
                 // if null, it is not needed for the tet
                 maxProductionPower != null ? new BigDecimal(maxProductionPower) : new BigDecimal(0), "30", // minStorageSoc
-                // (30%)
-                "30", // maxStorageSoc (30%)
+                                                                                                           // (30%)
+                maxStorageSoc == null ? "30" : maxStorageSoc.toString(), // maxStorageSoc (30%)
                 "prodPower", // productionPower item name
                 "gridPower", // gridPower item name
                 "storageSoc", // storageSoc item name
@@ -96,8 +94,8 @@ class SurplusDecisionEngineTest {
     void testDetermineDesiredState_TurnOff_SwitchingPowerNullSufficientNegativeSurplus() {
         // setup
         InputItemsState state = buildInputState(0, 0, 0, 0, 0.1);
-        SurplusOutputParameters params = SurplusOutputParameters.builder().loadPower(300).maxElectricityPrice(10)
-                .build(); // switchingPower is null
+        SurplusOutputParameters params = SurplusOutputParameters.builder().priority(1).loadPower(300)
+                .maxElectricityPrice(10).build(); // switchingPower is null
         double availableSurplusW = -300;
         OnOffType currentState = OnOffType.ON;
         Instant now = Instant.now();
@@ -117,7 +115,7 @@ class SurplusDecisionEngineTest {
         // setup
         InputItemsState state = buildInputState(0, 0, 0, 0, -5.0);
         SurplusOutputParameters params = buildOutputParameters(1000, 1000, 10, null, null);
-        double availableSurplusW = 1500;
+        double availableSurplusW = 0;
         OnOffType currentState = OnOffType.OFF;
         Instant now = Instant.now();
         Instant lastDeactivation = now.minusSeconds(60);
@@ -272,7 +270,7 @@ class SurplusDecisionEngineTest {
         InputItemsState state = buildInputState(1500, 0, 95, -10, null);
         state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
                 .maxStorageSoc(new DecimalType(95)).build();
-        EnergyManagerConfiguration config = buildConfig(true, 2000, 0);
+        EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 95);
 
         // invoke
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
@@ -285,7 +283,7 @@ class SurplusDecisionEngineTest {
     void testGetAvailableSurplusWattage_ProductionNegative_ReturnsZero() {
         // setup
         InputItemsState state = buildInputState(-500, 100, 50, 0, null);
-        EnergyManagerConfiguration config = buildConfig(false, null, 0);
+        EnergyManagerConfiguration config = buildConfig(false, null, 0, null);
 
         // invoke
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
@@ -300,7 +298,7 @@ class SurplusDecisionEngineTest {
         InputItemsState state = buildInputState(1500, 0, 100, 0, null);
         state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
                 .maxStorageSoc(new DecimalType(95)).build();
-        EnergyManagerConfiguration config = buildConfig(true, 2000, 0);
+        EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 100);
 
         // invoke
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
@@ -315,7 +313,7 @@ class SurplusDecisionEngineTest {
         InputItemsState state = buildInputState(1500, 100, 100, 0, null);
         state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
                 .maxStorageSoc(new DecimalType(95)).build();
-        EnergyManagerConfiguration config = buildConfig(true, 2000, 0);
+        EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 100);
 
         // invoke
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
@@ -328,7 +326,7 @@ class SurplusDecisionEngineTest {
     void testGetAvailableSurplusWattage_WithMinAvailableSurplus_PositiveSurplusButMinLarger() {
         // setup
         InputItemsState state = buildInputState(2000, -1000, 50, 0, null);
-        EnergyManagerConfiguration config = buildConfig(false, null, 1500);
+        EnergyManagerConfiguration config = buildConfig(false, null, 1500, null);
 
         // invoke
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);

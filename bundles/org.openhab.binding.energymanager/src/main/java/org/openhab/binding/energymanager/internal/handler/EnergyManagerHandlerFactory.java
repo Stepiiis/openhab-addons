@@ -20,7 +20,8 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
 import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
-import org.openhab.binding.energymanager.internal.state.EnergyManagerStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerInputStateHolder;
+import org.openhab.binding.energymanager.internal.state.EnergyManagerOutputStateHolder;
 import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
@@ -63,12 +64,13 @@ public class EnergyManagerHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (THING_TYPE_MANAGER.equals(thingTypeUID)) {
-            EnergyManagerStateHolder stateHolder = new EnergyManagerStateHolder();
-            ConfigUtilService configUtilService = new ConfigUtilService(stateHolder);
+            EnergyManagerOutputStateHolder outPutStateHolder = new EnergyManagerOutputStateHolder();
+            EnergyManagerInputStateHolder inputStateHolder = new EnergyManagerInputStateHolder();
+            ConfigUtilService configUtilService = new ConfigUtilService(inputStateHolder);
             EnergyBalancingEngine energyBalancingEngine = new EnergyBalancingEngine(surplusDecisionEngine,
-                    configUtilService, stateHolder);
-            return new EnergyManagerHandler(thing, eventsSubscriber, configUtilService, stateHolder,
-                    energyBalancingEngine);
+                    configUtilService, outPutStateHolder);
+            return new EnergyManagerHandler(thing, eventsSubscriber, configUtilService, outPutStateHolder,
+                    inputStateHolder, energyBalancingEngine);
         }
 
         return null;
