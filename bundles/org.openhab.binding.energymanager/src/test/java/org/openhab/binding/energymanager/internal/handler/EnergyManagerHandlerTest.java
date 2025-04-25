@@ -80,7 +80,7 @@ class EnergyManagerHandlerTest {
 
     EnergyManagerConfiguration config = new EnergyManagerConfiguration(new BigDecimal(30), new BigDecimal(10_000),
             MIN_STORAGE_SOC, MAX_STORAGE_SOC, PROD_PWR, GRID_POWER, STORAGE_SOC, STORAGE_POWER, ELECTRICITY_PRICE,
-            new BigDecimal(0), new BigDecimal(0), true, true);
+            new BigDecimal(0), new BigDecimal(0), true, true, new BigDecimal(50));
 
     @BeforeEach
     void init() {
@@ -146,7 +146,7 @@ class EnergyManagerHandlerTest {
         var newConfig = new EnergyManagerConfiguration(config.refreshInterval(), config.maxProductionPower(), "30",
                 "30", config.productionPower(), config.gridPower(), config.storageSoc(), config.storagePower(),
                 config.electricityPrice(), config.minAvailableSurplusEnergy(), config.initialDelay(),
-                config.toggleOnNegativePrice(), config.enableInverterLimitingHeuristic());
+                config.toggleOnNegativePrice(), config.enableInverterLimitingHeuristic(), config.toleratedGridDraw());
 
         // invoke
         managerHandler.registerEvents(newConfig);
@@ -158,7 +158,8 @@ class EnergyManagerHandlerTest {
     @Test
     void testHandleItemStateUpdate() {
         // setup
-        ItemStateEvent itemEvent = ItemEventFactory.createStateEvent("storagePower", OnOffType.ON, null);
+        ItemStateEvent itemEvent = ItemEventFactory.createStateEvent("storagePower", OnOffType.ON,
+                this.getClass().getSimpleName());
         ThingParameterItemName item = ThingParameterItemName.STORAGE_POWER;
 
         // invoke

@@ -24,20 +24,19 @@ import org.eclipse.jdt.annotation.Nullable;
  */
 @NonNullByDefault
 public record SurplusOutputParameters(int priority, int loadPower, @Nullable Integer switchingPower,
-        @Nullable Integer minRuntimeMinutes, @Nullable Integer minCooldownMinutes,
-        @Nullable Integer maxElectricityPrice) {
+        int minRuntimeMinutes, int minCooldownMinutes, @Nullable Double maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
         return SurplusOutputParametersBuilder.create();
     }
 
     public static class SurplusOutputParametersBuilder {
-        private @Nullable Integer priority = null;
-        private @Nullable Integer loadPower = null;
+        private int priority;
+        private int loadPower;
         private @Nullable Integer switchingPower = null;
-        private @Nullable Integer minRuntimeMinutes = null;
-        private @Nullable Integer minCooldownMinutes = null;
-        private @Nullable Integer maxElectricityPrice = null;
+        private int minRuntimeMinutes;
+        private int minCooldownMinutes;
+        private @Nullable Double maxElectricityPrice = null;
 
         private SurplusOutputParametersBuilder() {
             // Private constructor to prevent direct instantiation
@@ -62,25 +61,22 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
             return this;
         }
 
-        public SurplusOutputParametersBuilder minRuntimeMinutes(@Nullable Integer minRuntimeMinutes) {
+        public SurplusOutputParametersBuilder minRuntimeMinutes(int minRuntimeMinutes) {
             this.minRuntimeMinutes = minRuntimeMinutes;
             return this;
         }
 
-        public SurplusOutputParametersBuilder minCooldownMinutes(@Nullable Integer minCooldownMinutes) {
+        public SurplusOutputParametersBuilder minCooldownMinutes(int minCooldownMinutes) {
             this.minCooldownMinutes = minCooldownMinutes;
             return this;
         }
 
-        public SurplusOutputParametersBuilder maxElectricityPrice(@Nullable Integer maxElectricityPrice) {
+        public SurplusOutputParametersBuilder maxElectricityPrice(Double maxElectricityPrice) {
             this.maxElectricityPrice = maxElectricityPrice;
             return this;
         }
 
         public SurplusOutputParameters build() {
-            if (priority == null || loadPower == null) {
-                throw new IllegalStateException("Priority or loadPower can never be null");
-            }
             return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes,
                     minCooldownMinutes, maxElectricityPrice);
         }

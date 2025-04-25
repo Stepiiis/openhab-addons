@@ -16,7 +16,7 @@
 				<label>Refresh Interval (seconds)</label>
 				<description>How often to evaluate energy status and update output signals.</description>
 			</parameter>
-			<parameter name="maxProductionPower" type="integer" min="0" max="100" required="true">
+			<parameter name="maxProductionPower" type="integer" min="0" required="true">
 				<label>Theoretical maximal electricity production power (W)</label>
 				<description>Used to calculate potential surplus if grid feed in is not permitted at the point in
 					time.
@@ -48,18 +48,13 @@
 				<label>Item production power (W)</label>
 				<description>Name of Item representing current local generation power (in Watts, positive).</description>
 			</parameter>
-			<parameter name="gridPower" type="text" required="true">
-				<label>Item grid power (W)</label>
-				<description>Name of Item representing grid power (in Watts, negative=feed-in, positive=import).
-				</description>
-			</parameter>
 			<parameter name="storageSoc" type="text" required="true">
 				<label>Item ESS SOC (%)</label>
 				<description>Name of Item representing Battery SOC (in Percent, 0-100).</description>
 			</parameter>
 			<parameter name="storagePower" type="text" required="true">
 				<label>ESS power (W)</label>
-				<description>Name to Item representing ESS power draw (in Watts, negative=charging, positive=discharging).
+				<description>Name to Item representing ESS power draw (in Watts, negative=discharging, positive=charging).
 				</description>
 			</parameter>
 			<parameter name="electricityPrice" type="text" required="true">
@@ -80,6 +75,13 @@
 					available for e.g. ESS or grid feed in.
 				</description>
 				<default>0</default>
+			</parameter>
+			<parameter name="toleratedGridDraw" type="integer" min="0" required="false">
+				<label>Tolerated grid draw (W)</label>
+				<description>
+					This value is used to smooth out surplus calculation. Use with caution.
+				</description>
+				<default>50</default>
 			</parameter>
 			<parameter name="initialDelay" type="integer" min="30" required="false">
 				<label>Initial delay (seconds)</label>
@@ -120,12 +122,10 @@
 					Duplicate priorities lead to
 					undefined order.
 				</description>
-				<default>1</default>
 			</parameter>
 			<parameter name="loadPower" type="integer" min="0" required="true">
 				<label>Load power (W)</label>
 				<description>The power consumption of the load controlled by this signal.</description>
-				<default>1000</default>
 			</parameter>
 			<parameter name="switchingPower" type="integer" min="0" required="false">
 				<label>Switching power (W)</label>
@@ -139,7 +139,6 @@
 					If left empty, the loadPower is used as
 					switchingPower.
 				</description>
-				<default>1000</default>
 			</parameter>
 			<parameter name="minRuntimeMinutes" type="integer" min="0" required="false">
 				<label>Min runtime (minutes)</label>

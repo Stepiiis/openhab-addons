@@ -62,13 +62,12 @@ public class SurplusDecisionEngine {
             }
         }
 
-        LOGGER.debug("There {} enough surplus for channel. availableSurplus={}, loadPower={}, switchingPower={}",
-                hasSurplus ? "is" : "is not", availableSurplusW, channelParameters.loadPower(),
-                channelParameters.switchingPower());
+        LOGGER.debug("There {} enough surplus for channel. availableSurplus={}, switchingPower={}",
+                hasSurplus ? "is" : "is not", availableSurplusW, switchingPower);
 
         boolean isPriceOk = isPriceAcceptable(channelParameters, state);
         LOGGER.debug("Price {} acceptable for channel. electricityPrice={}, maxElectricityPrice={}",
-                hasSurplus ? "is" : "is not", state.electricityPrice(), channelParameters.maxElectricityPrice());
+                isPriceOk ? "is" : "is not", state.electricityPrice(), channelParameters.maxElectricityPrice());
 
         OnOffType desiredState = (hasSurplus && isPriceOk) ? OnOffType.ON : OnOffType.OFF;
 
@@ -80,14 +79,19 @@ public class SurplusDecisionEngine {
             OnOffType desiredState, Instant lastActivation, Instant lastDeactivation, Instant now) {
         OnOffType result = desiredState;
 
-        if (config.minCooldownMinutes() != null && currentState == OnOffType.OFF && desiredState == OnOffType.ON
-                && lastDeactivation.isAfter(now.minus(config.minCooldownMinutes(), ChronoUnit.MINUTES))) {
-            result = OnOffType.OFF;
+        if (config.minCooldownMinutes() != 0 && currentState == OnOffType.OFF && desiredState == OnOffType.ON) {
+            // for some reason, isAfter works for exact matches but isBefore does not
+            boolean canBeSwitchedOn = !lastDeactivation
+                    .isAfter(now.minus(config.minCooldownMinutes(), ChronoUnit.MINUTES));
+            LOGGER.trace("Checking for minimal cooldown constraint = {}", canBeSwitchedOn);
+            result = canBeSwitchedOn ? OnOffType.ON : OnOffType.OFF;
         }
 
-        if (config.minRuntimeMinutes() != null && currentState == OnOffType.ON && desiredState == OnOffType.OFF
-                && lastActivation.isAfter(now.minus(config.minRuntimeMinutes(), ChronoUnit.MINUTES))) {
-            result = OnOffType.ON;
+        if (config.minRuntimeMinutes() != 0 && currentState == OnOffType.ON && desiredState == OnOffType.OFF) {
+            boolean canBeSwitchedOff = !lastActivation
+                    .isAfter(now.minus(config.minRuntimeMinutes(), ChronoUnit.MINUTES));
+            LOGGER.trace("Checking for minimal runtime constraint = {}", canBeSwitchedOff);
+            result = canBeSwitchedOff ? OnOffType.OFF : OnOffType.ON;
         }
 
         LOGGER.debug(
@@ -98,7 +102,7 @@ public class SurplusDecisionEngine {
     }
 
     private boolean isPriceAcceptable(SurplusOutputParameters config, InputItemsState state) {
-        Integer maxPrice = config.maxElectricityPrice();
+        Double maxPrice = config.maxElectricityPrice();
 
         if (maxPrice == null) {
             // No price constraint set, always acceptable
@@ -113,25 +117,34 @@ public class SurplusDecisionEngine {
         return state.electricityPrice().doubleValue() <= maxPrice;
     }
 
-    public double getAvailableSurplusWattage(InputItemsState state, EnergyManagerConfiguration config) {
+    public double getAvailableSurplusWattage(InputItemsState state, EnergyManagerConfiguration config,
+            int currentlySwitchedOnWattage) {
         if (state.productionPower().doubleValue() <= 0) {
             return 0;
         }
 
         // All grid feed in is considered surplus energy, however any grid consumption should be avoided if possible
-        double availableSurplusW = -state.gridPower().doubleValue();
+        double gridPower = state.gridPower().doubleValue();
+        if (gridPower < 0 && -gridPower < config.toleratedGridDraw().longValue()) {
+            gridPower = 0;
+        }
+        double availableSurplusW = gridPower;
 
-        // storagePower is negative - Any power going to ESS is a surplus because the minimal SOC of ESS is reached now
-        // storagePower is positive + If we are using energy from the battery which should be avoided if not necessary
-        availableSurplusW -= state.storagePower().doubleValue();
+        // storagePower is negative - Using energy from the battery which should be avoided if not necessary
+        // storagePower is positive + Any power going to ESS is a surplus because the minimal SOC of ESS has been
+        // reached
+        availableSurplusW += state.storagePower().doubleValue();
 
         if (config.enableInverterLimitingHeuristic()) {
             availableSurplusW += getPotentialSurplusDueToFullESSandInverterLimitation(state, config);
         }
 
-        // if there is any surplus, some of it should be available to other needs according to user
         if (availableSurplusW > 0) {
+            // if there is a surplus, some of it should be available to other needs according to user
             availableSurplusW -= config.minAvailableSurplusEnergy().longValue();
+            // any currently switched on appliances could be from lower priorities, therefore we count them as available
+            // surplus
+            availableSurplusW += currentlySwitchedOnWattage;
         }
 
         LOGGER.debug("Calculated Surplus: {}W", availableSurplusW);
@@ -150,7 +163,7 @@ public class SurplusDecisionEngine {
         if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()) {
             if (DecimalType.ZERO.equals(state.gridPower())
                     // some power going to the ESS is allowed, but none from it
-                    && state.storagePower().longValue() <= 0
+                    && state.storagePower().longValue() >= 0
                     && state.productionPower().longValue() < config.maxProductionPower().longValue()) {
                 return config.maxProductionPower().longValue() - state.productionPower().longValue();
             }

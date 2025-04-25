@@ -125,6 +125,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 }
             }
         }
+        LOGGER.info("Thing {} is registering event subscription for {}", thing.getUID(), itemMapping);
         eventSubscriber.registerEventsFor(thing.getUID(), itemMapping, this::handleItemStateUpdate);
     }
 
@@ -146,7 +147,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
     @Override
     public void dispose() {
-        LOGGER.debug("Disposing Energy Manager Handler for {}", getThing().getUID());
+        LOGGER.info("Disposing Energy Manager Handler for {}", getThing().getUID());
         stopEvaluationJob();
 
         outputStateHolder.clear();
@@ -238,6 +239,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 .flatMap(ch -> {
                     var opt = configUtilService.parseSurplusOutputParameters(ch.getConfiguration());
                     if (opt != null) {
+                        LOGGER.trace("Read channel {} with parameters {}", ch.getUID(), opt);
                         return Stream.of(Map.entry(ch.getUID(), opt));
                     } else {
                         LOGGER.error("Could not read channel {} parameters, ignoring it.", ch.getUID());
@@ -262,7 +264,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
         if (forceUpdate || newState != previousState) {
             updateState(channelUID, newState);
-            LOGGER.debug("Updated status of channel {} to {}", channelUID.getId(), newState);
+            LOGGER.info("Changed status of channel {} to {}", channelUID.getId(), newState);
         } else {
             LOGGER.debug("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
         }
@@ -278,7 +280,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
     private boolean verifyStateValueDuringEvaluation(@Nullable InputItemsState state,
             EnergyManagerConfiguration config) {
         if (state == null) {
-            LOGGER.warn("Cannot build ManagerState: One or more required input state is null.");
+            LOGGER.debug("InputItemsState could not be verified: One or more required input state is null.");
             if (!wasNotReady) {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NOT_YET_READY,
                         "One or more required input state is still null. It has either not yet received an update or is invalid");

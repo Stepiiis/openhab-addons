@@ -178,11 +178,8 @@ public class ConfigUtilService {
         }
 
         DecimalType fromChannel = this.getInputStateInDecimal(MIN_STORAGE_SOC);
-        LOGGER.debug("Converted value from config is {}", fromChannel != null ? fromChannel : defaultValue);
-        if (fromChannel != null) {
-            return fromChannel;
-        }
-
-        return defaultValue;
+        DecimalType result = fromChannel != null ? fromChannel : defaultValue;
+        LOGGER.debug("Converted value from config is {}", result);
+        return result;
     }
 }

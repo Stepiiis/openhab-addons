@@ -138,6 +138,7 @@ public class ConfigUtilServiceTest {
         propertiesMap.put("maxProductionPower", new BigDecimal(60));
         propertiesMap.put("initialDelay", new BigDecimal(60));
         propertiesMap.put("enableInverterLimitingHeuristic", true);
+        propertiesMap.put("toleratedGridDraw", new BigDecimal(60));
 
         EnergyManagerConfiguration result = configUtilService.getTypedConfig(propertiesMap);
 
@@ -155,5 +156,6 @@ public class ConfigUtilServiceTest {
         assertEquals(new BigDecimal(60), result.maxProductionPower());
         assertEquals(new BigDecimal(60), result.initialDelay());
         assertEquals(true, result.enableInverterLimitingHeuristic());
+        assertEquals(new BigDecimal(60), result.toleratedGridDraw());
     }
 }

@@ -31,5 +31,5 @@ public record EnergyManagerConfiguration(
         String productionPower, String gridPower, String storageSoc, String storagePower, String electricityPrice,
         // optional with default values
         BigDecimal minAvailableSurplusEnergy, BigDecimal initialDelay, Boolean toggleOnNegativePrice,
-        Boolean enableInverterLimitingHeuristic) {
+        Boolean enableInverterLimitingHeuristic, BigDecimal toleratedGridDraw) {
 }

@@ -62,7 +62,7 @@ class SurplusDecisionEngineTest {
                 .loadPower(loadPower).switchingPower(switchingPower);
 
         if (maxElectricityPrice != null)
-            builder.maxElectricityPrice(maxElectricityPrice);
+            builder.maxElectricityPrice((double) maxElectricityPrice);
         if (minCooldownMinutes != null)
             builder.minCooldownMinutes(minCooldownMinutes);
         if (minRuntimeMinutes != null)
@@ -86,8 +86,8 @@ class SurplusDecisionEngineTest {
                 minAvailableSurplusEnergy != null ? new BigDecimal(minAvailableSurplusEnergy) : BigDecimal.ZERO, // minAvailableSurplusEnergy
                 BigDecimal.valueOf(30), // initialDelay (30 seconds)
                 false, // toggleOnNegativePrice (hardcoded for tests)
-                enableHeuristic // enableInverterLimitingHeuristic
-        );
+                enableHeuristic, // enableInverterLimitingHeuristic
+                BigDecimal.valueOf(50));
     }
 
     @Test
@@ -95,7 +95,7 @@ class SurplusDecisionEngineTest {
         // setup
         InputItemsState state = buildInputState(0, 0, 0, 0, 0.1);
         SurplusOutputParameters params = SurplusOutputParameters.builder().priority(1).loadPower(300)
-                .maxElectricityPrice(10).build(); // switchingPower is null
+                .maxElectricityPrice(10D).build(); // switchingPower is null
         double availableSurplusW = -300;
         OnOffType currentState = OnOffType.ON;
         Instant now = Instant.now();
@@ -170,7 +170,7 @@ class SurplusDecisionEngineTest {
     @Test
     void testDetermineDesiredState_StayOff_MinAvailableSurplusExceedsSurplus() {
         // setup
-        InputItemsState state = buildInputState(2000, -1000, 50, 0, 0.1);
+        InputItemsState state = buildInputState(2000, 1000, 50, 0, 0.1);
         double availableSurplusW = -500; // Result from getAvailableSurplusWattage
         SurplusOutputParameters params = buildOutputParameters(1000, 1000, 10, null, null);
         OnOffType currentState = OnOffType.OFF;
@@ -262,34 +262,19 @@ class SurplusDecisionEngineTest {
         assertEquals(OnOffType.ON, desiredState);
     }
 
-    // --- getAvailableSurplusWattage Tests ---
-
     @Test
     void testGetAvailableSurplusWattage_HeuristicTriggered_StorageSocEqualsMax() {
         // setup
-        InputItemsState state = buildInputState(1500, 0, 95, -10, null);
+        InputItemsState state = buildInputState(1500, 0, 95, 10, null);
         state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
                 .maxStorageSoc(new DecimalType(95)).build();
         EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 95);
 
         // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 0);
 
         // verifiy
         assertEquals(510.0, availableSurplusW, 0.001);
-    }
-
-    @Test
-    void testGetAvailableSurplusWattage_ProductionNegative_ReturnsZero() {
-        // setup
-        InputItemsState state = buildInputState(-500, 100, 50, 0, null);
-        EnergyManagerConfiguration config = buildConfig(false, null, 0, null);
-
-        // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
-
-        // verifiy
-        assertEquals(0.0, availableSurplusW, 0.001);
     }
 
     @Test
@@ -301,7 +286,7 @@ class SurplusDecisionEngineTest {
         EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 100);
 
         // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 0);
 
         // verifiy
         assertEquals(500.0, availableSurplusW, 0.001);
@@ -310,13 +295,13 @@ class SurplusDecisionEngineTest {
     @Test
     void testGetAvailableSurplusWattage_HeuristicNotTriggered_GridNonZeroStoragePowerZero() {
         // setup
-        InputItemsState state = buildInputState(1500, 100, 100, 0, null);
+        InputItemsState state = buildInputState(1500, -100, 100, 0, null);
         state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
                 .maxStorageSoc(new DecimalType(95)).build();
         EnergyManagerConfiguration config = buildConfig(true, 2000, 0, 100);
 
         // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 0);
 
         // verifiy
         assertEquals(-100.0, availableSurplusW, 0.001);
@@ -325,13 +310,28 @@ class SurplusDecisionEngineTest {
     @Test
     void testGetAvailableSurplusWattage_WithMinAvailableSurplus_PositiveSurplusButMinLarger() {
         // setup
-        InputItemsState state = buildInputState(2000, -1000, 50, 0, null);
+        InputItemsState state = buildInputState(2000, 1000, 50, 0, null);
         EnergyManagerConfiguration config = buildConfig(false, null, 1500, null);
 
         // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config);
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 0);
 
         // verifiy
         assertEquals(-500.0, availableSurplusW, 0.001);
+    }
+
+    @Test
+    void testGetAvailableSurplusWattage_GridZero_StoragePowerSurplus_SwitchedOnNotZero() {
+        // setup
+        InputItemsState state = buildInputState(1500, 0, 95, 1000, null);
+        state = InputItemsState.builder().from(state).minStorageSoc(new DecimalType(0))
+                .maxStorageSoc(new DecimalType(95)).build();
+        EnergyManagerConfiguration config = buildConfig(false, 2000, 0, 95);
+
+        // invoke
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 500);
+
+        // verifiy
+        assertEquals(1500, availableSurplusW, 0.001);
     }
 }

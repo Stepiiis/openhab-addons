@@ -14,6 +14,7 @@ package org.openhab.binding.energymanager.internal.state;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -43,17 +44,17 @@ public class EnergyManagerOutputStateHolder extends EnergyManagerStateHolder {
         this.lastDeactivationTime.clear();
     }
 
-    public @Nullable State getState(ChannelUID channelUID) {
+    public synchronized @Nullable State getState(ChannelUID channelUID) {
         return this.states.get(channelUID.getId());
     }
 
     @Override
-    public void saveState(String channelId, State state) {
+    public synchronized void saveState(String channelId, State state) {
         saveState(channelId, state, false);
     }
 
-    public void saveState(String channelId, State state, boolean updateLasts) {
-        if (updateLasts) {
+    public synchronized void saveState(String channelId, State state, boolean updateLasts) {
+        if (updateLasts && Objects.equals(state, this.states.get(channelId))) {
             updateLasts(channelId, state);
         }
         super.saveState(channelId, state);
@@ -66,7 +67,7 @@ public class EnergyManagerOutputStateHolder extends EnergyManagerStateHolder {
                 case ON -> lastActivationTime.put(channelId, now);
                 case OFF -> lastDeactivationTime.put(channelId, now);
             }
-            LOGGER.debug("Updated channel {} at {}", channelId, now);
+            LOGGER.trace("Updated channel {} at {}", channelId, now);
         }
     }
 

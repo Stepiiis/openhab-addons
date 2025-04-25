@@ -76,19 +76,22 @@ public class EnergyBalancingEngine {
             return;
         }
 
-        LOGGER.debug("Inputs: state={}", state);
+        LOGGER.trace("Inputs: state={}", state);
 
-        double availableSurplusW = surplusDecisionEngine
-                .getAvailableSurplusWattage(Objects.<@NonNull InputItemsState> requireNonNull(state), config);
+        int currentlySwitchedOnWattage = outputChannels.stream()
+                .filter(it -> OnOffType.ON.equals(outputStateHolder.getState(it.getKey())))
+                .mapToInt(it -> it.getValue().loadPower()).sum();
+
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(
+                Objects.<@NonNull InputItemsState> requireNonNull(state), config, currentlySwitchedOnWattage);
 
         if (outputChannels.isEmpty()) {
-            LOGGER.debug(
+            LOGGER.info(
                     "No output channels of type '{}' configured. Nothing to evaluate. Please configure your channels inside the ",
                     EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT);
             return;
         }
 
-        LOGGER.debug("Evaluating {} output channels by priority...", outputChannels.size());
         Instant now = Instant.now();
 
         boolean loadShedding;
@@ -108,19 +111,22 @@ public class EnergyBalancingEngine {
             ChannelUID channelUID = channel.getKey();
             SurplusOutputParameters channelParameters = channel.getValue();
 
+            LOGGER.debug("Evaluating channel {}...", channelUID);
+
             // With default state of channels if it was never saved being OFF
             OnOffType currentState = (OnOffType) Objects.requireNonNullElse(outputStateHolder.getState(channelUID),
                     OnOffType.OFF);
             if (loadShedding && OnOffType.OFF.equals(currentState)) {
+                LOGGER.trace("Ignoring turned off channel {} in load shedding mode.", channelUID);
                 continue;
             }
 
             Instant lastActivationTime = outputStateHolder.getLastActivationTime(channelUID);
             Instant lastDeactivationTime = outputStateHolder.getLastDeactivationTime(channelUID);
-            LOGGER.debug("Last activation of channel {} was {}", channelUID, lastActivationTime);
-            LOGGER.debug("Last deactivation of channel {} was {}", channelUID, lastDeactivationTime);
+            LOGGER.trace("Last activation of channel {} was {}", channelUID, lastActivationTime);
+            LOGGER.trace("Last deactivation of channel {} was {}", channelUID, lastDeactivationTime);
             OnOffType desiredState = surplusDecisionEngine.determineDesiredState(channelParameters, state,
-                    availableSurplusW, currentState, now, lastActivationTime, lastDeactivationTime);
+                    availableSurplusW, currentState, lastActivationTime, lastDeactivationTime, now);
 
             updateDesiredStateConsumer.accept(channelUID, desiredState);
 
@@ -142,8 +148,8 @@ public class EnergyBalancingEngine {
         DecimalType storagePower = configUtilService.getInputStateInDecimal(STORAGE_POWER);
 
         if (production == null || gridPower == null || storageSoc == null || storagePower == null) {
-            LOGGER.error("production={} gridPower={} storageSoc={} storagePower={}", production, gridPower, storageSoc,
-                    storagePower);
+            LOGGER.error("One or more required states is null {}={} {}={} {}={} {}={}", PRODUCTION_POWER, production,
+                    GRID_POWER, gridPower, STORAGE_SOC, storageSoc, STORAGE_POWER, storagePower);
             return null;
         }
 
