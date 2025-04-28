@@ -49,12 +49,12 @@ public class EnergyManagerOutputStateHolder extends EnergyManagerStateHolder {
     }
 
     @Override
-    public synchronized void saveState(String channelId, State state) {
+    public void saveState(String channelId, State state) {
         saveState(channelId, state, false);
     }
 
     public synchronized void saveState(String channelId, State state, boolean updateLasts) {
-        if (updateLasts && Objects.equals(state, this.states.get(channelId))) {
+        if (updateLasts && !Objects.equals(state, this.states.get(channelId))) {
             updateLasts(channelId, state);
         }
         super.saveState(channelId, state);

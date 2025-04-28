@@ -24,12 +24,12 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public record EnergyManagerConfiguration(
         // required settings
-        BigDecimal refreshInterval, BigDecimal maxProductionPower,
+        BigDecimal refreshInterval, BigDecimal peakProductionPower,
         // required settings or item names
         String minStorageSoc, String maxStorageSoc,
         // required names of associated items
         String productionPower, String gridPower, String storageSoc, String storagePower, String electricityPrice,
         // optional with default values
         BigDecimal minAvailableSurplusEnergy, BigDecimal initialDelay, Boolean toggleOnNegativePrice,
-        Boolean enableInverterLimitingHeuristic, BigDecimal toleratedGridDraw) {
+        Boolean enableInverterLimitingHeuristic, BigDecimal toleratedPowerDraw) {
 }

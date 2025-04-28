@@ -29,7 +29,6 @@ import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 public enum SurplusOutputParametersEnum {
     PRIORITY("priority", true),
     LOAD_POWER("loadPower", true),
-    LOAD_SWITCHING_POWER("switchingPower", false),
     MIN_RUNTIME_MINUTES("minRuntimeMinutes", false),
     MIN_COOLDOWN_MINUTES("minCooldownMinutes", false),
     ELECTRICITY_PRICE("maxElectricityPrice", false);

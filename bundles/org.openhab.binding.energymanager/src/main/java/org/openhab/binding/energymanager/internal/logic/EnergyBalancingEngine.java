@@ -78,12 +78,13 @@ public class EnergyBalancingEngine {
 
         LOGGER.trace("Inputs: state={}", state);
 
-        int currentlySwitchedOnWattage = outputChannels.stream()
+        int currentlySwitchedOnWattageFromSurplus = outputChannels.stream()
                 .filter(it -> OnOffType.ON.equals(outputStateHolder.getState(it.getKey())))
                 .mapToInt(it -> it.getValue().loadPower()).sum();
 
         double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(
-                Objects.<@NonNull InputItemsState> requireNonNull(state), config, currentlySwitchedOnWattage);
+                Objects.<@NonNull InputItemsState> requireNonNull(state), config,
+                currentlySwitchedOnWattageFromSurplus);
 
         if (outputChannels.isEmpty()) {
             LOGGER.info(
@@ -117,7 +118,8 @@ public class EnergyBalancingEngine {
             OnOffType currentState = (OnOffType) Objects.requireNonNullElse(outputStateHolder.getState(channelUID),
                     OnOffType.OFF);
             if (loadShedding && OnOffType.OFF.equals(currentState)) {
-                LOGGER.trace("Ignoring turned off channel {} in load shedding mode.", channelUID);
+                LOGGER.trace("Not evaluating turned off channel {} in load shedding mode.", channelUID);
+                updateDesiredStateConsumer.accept(channelUID, OnOffType.OFF);
                 continue;
             }
 
@@ -133,6 +135,9 @@ public class EnergyBalancingEngine {
             // We always change state of only one channel during one cycle
             if (currentState != desiredState) {
                 break;
+            }
+            if (desiredState == OnOffType.ON) {
+                availableSurplusW -= channelParameters.loadPower();
             }
         }
         LOGGER.debug("Finished periodic evaluating of energy surplus.");

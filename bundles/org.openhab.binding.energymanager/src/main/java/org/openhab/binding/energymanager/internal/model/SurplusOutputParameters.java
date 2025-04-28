@@ -23,8 +23,8 @@ import org.eclipse.jdt.annotation.Nullable;
  *
  */
 @NonNullByDefault
-public record SurplusOutputParameters(int priority, int loadPower, @Nullable Integer switchingPower,
-        int minRuntimeMinutes, int minCooldownMinutes, @Nullable Double maxElectricityPrice) {
+public record SurplusOutputParameters(int priority, int loadPower, int minRuntimeMinutes, int minCooldownMinutes,
+        @Nullable Double maxElectricityPrice) {
 
     public static SurplusOutputParametersBuilder builder() {
         return SurplusOutputParametersBuilder.create();
@@ -33,7 +33,6 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
     public static class SurplusOutputParametersBuilder {
         private int priority;
         private int loadPower;
-        private @Nullable Integer switchingPower = null;
         private int minRuntimeMinutes;
         private int minCooldownMinutes;
         private @Nullable Double maxElectricityPrice = null;
@@ -48,11 +47,6 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
 
         public SurplusOutputParametersBuilder loadPower(int loadPower) {
             this.loadPower = loadPower;
-            return this;
-        }
-
-        public SurplusOutputParametersBuilder switchingPower(@Nullable Integer switchingPower) {
-            this.switchingPower = switchingPower;
             return this;
         }
 
@@ -77,8 +71,8 @@ public record SurplusOutputParameters(int priority, int loadPower, @Nullable Int
         }
 
         public SurplusOutputParameters build() {
-            return new SurplusOutputParameters(priority, loadPower, switchingPower, minRuntimeMinutes,
-                    minCooldownMinutes, maxElectricityPrice);
+            return new SurplusOutputParameters(priority, loadPower, minRuntimeMinutes, minCooldownMinutes,
+                    maxElectricityPrice);
         }
     }
 }

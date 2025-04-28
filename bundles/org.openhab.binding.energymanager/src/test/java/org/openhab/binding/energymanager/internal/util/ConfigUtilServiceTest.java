@@ -135,10 +135,10 @@ public class ConfigUtilServiceTest {
         propertiesMap.put("minStorageSoc", "50");
         propertiesMap.put("maxStorageSoc", "95");
         propertiesMap.put("productionPower", "prodPower");
-        propertiesMap.put("maxProductionPower", new BigDecimal(60));
+        propertiesMap.put("peakProductionPower", new BigDecimal(60));
         propertiesMap.put("initialDelay", new BigDecimal(60));
         propertiesMap.put("enableInverterLimitingHeuristic", true);
-        propertiesMap.put("toleratedGridDraw", new BigDecimal(60));
+        propertiesMap.put("toleratedPowerDraw", new BigDecimal(60));
 
         EnergyManagerConfiguration result = configUtilService.getTypedConfig(propertiesMap);
 
@@ -153,9 +153,9 @@ public class ConfigUtilServiceTest {
         assertEquals("50", result.minStorageSoc());
         assertEquals("95", result.maxStorageSoc());
         assertEquals("prodPower", result.productionPower());
-        assertEquals(new BigDecimal(60), result.maxProductionPower());
+        assertEquals(new BigDecimal(60), result.peakProductionPower());
         assertEquals(new BigDecimal(60), result.initialDelay());
         assertEquals(true, result.enableInverterLimitingHeuristic());
-        assertEquals(new BigDecimal(60), result.toleratedGridDraw());
+        assertEquals(new BigDecimal(60), result.toleratedPowerDraw());
     }
 }

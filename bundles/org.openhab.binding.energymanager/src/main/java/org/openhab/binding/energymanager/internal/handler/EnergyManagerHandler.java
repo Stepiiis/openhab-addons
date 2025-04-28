@@ -13,7 +13,6 @@
 package org.openhab.binding.energymanager.internal.handler;
 
 import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.*;
-import static org.openhab.core.types.RefreshType.REFRESH;
 
 import java.util.*;
 import java.util.concurrent.Future;
@@ -41,7 +40,6 @@ import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
-import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +90,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
 
         inputStateHolder.clear();
         outputStateHolder.clear();
+
+        stopEvaluationJob();
 
         EnergyManagerConfiguration config = loadAndValidateConfig();
         if (config == null) {
@@ -163,10 +163,6 @@ public class EnergyManagerHandler extends BaseThingHandler {
                 .noneMatch(it -> channelUID.equals(it.getUID()))) {
             LOGGER.warn("Received command '{}' for unexpected channel '{}'. Only {} types are suppoted", command,
                     channelUID, EnergyManagerBindingConstants.CHANNEL_TYPE_SURPLUS_OUTPUT);
-            return;
-        }
-        if (REFRESH.equals(command)) {
-            reinitialize();
         }
     }
 
@@ -179,17 +175,9 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     @Override
-    protected void updateState(ChannelUID channelUID, State state) {
-        super.updateState(channelUID, state);
-        outputStateHolder.saveState(channelUID.getId(), state, true);
-    }
-
-    @Override
     public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
         LOGGER.debug("Handling configuration update for {}", getThing().getUID());
         updateStatus(ThingStatus.INITIALIZING);
-
-        stopEvaluationJob();
 
         super.handleConfigurationUpdate(configurationParameters);
 
@@ -249,7 +237,13 @@ public class EnergyManagerHandler extends BaseThingHandler {
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState) {
-        updateOutputState(channelUID, newState, false);
+        final boolean forceUpdate;
+        if (newState == OnOffType.OFF) {
+            forceUpdate = true;
+        } else {
+            forceUpdate = false;
+        }
+        updateOutputState(channelUID, newState, forceUpdate);
     }
 
     private void updateOutputState(ChannelUID channelUID, OnOffType newState, boolean forceUpdate) {
@@ -262,6 +256,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         }
         OnOffType previousState = Objects.requireNonNullElse((OnOffType) savedState, OnOffType.OFF);
 
+        outputStateHolder.saveState(channelUID.getId(), newState, newState != previousState);
         if (forceUpdate || newState != previousState) {
             updateState(channelUID, newState);
             LOGGER.info("Changed status of channel {} to {}", channelUID.getId(), newState);

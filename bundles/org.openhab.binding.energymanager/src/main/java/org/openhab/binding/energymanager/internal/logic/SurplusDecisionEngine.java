@@ -19,7 +19,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.model.InputItemsState;
 import org.openhab.binding.energymanager.internal.model.SurplusOutputParameters;
-import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -39,26 +38,17 @@ public class SurplusDecisionEngine {
             double availableSurplusW, OnOffType currentState, Instant lastActivation, Instant lastDeactivation,
             Instant now) {
 
-        // Not really necessary, because negative price is handled elsewhere, but used for completeness
-        if (state.electricityPrice() != null && state.electricityPrice().longValue() < 0) {
-            return OnOffType.ON;
-        }
-
         boolean hasSurplus;
 
-        long switchingPower = channelParameters.switchingPower() == null ? channelParameters.loadPower()
-                : channelParameters.switchingPower();
+        long switchingPower = channelParameters.loadPower();
+
         if (OnOffType.OFF.equals(currentState)) {
             hasSurplus = availableSurplusW >= switchingPower;
         } else {
-            if (channelParameters.loadPower() < switchingPower) {
-                LOGGER.error(
-                        "Load power of given channel is lower than it's switching power. This is undefined behaviour.");
-            }
-            if (availableSurplusW < 0 && -availableSurplusW >= channelParameters.loadPower() - switchingPower) {
+            if (availableSurplusW < 0) {
                 hasSurplus = false;
             } else {
-                return currentState;
+                hasSurplus = availableSurplusW >= switchingPower;
             }
         }
 
@@ -124,27 +114,31 @@ public class SurplusDecisionEngine {
         }
 
         // All grid feed in is considered surplus energy, however any grid consumption should be avoided if possible
-        double gridPower = state.gridPower().doubleValue();
-        if (gridPower < 0 && -gridPower < config.toleratedGridDraw().longValue()) {
-            gridPower = 0;
-        }
-        double availableSurplusW = gridPower;
+        int availableSurplusW = state.gridPower().intValue();
 
         // storagePower is negative - Using energy from the battery which should be avoided if not necessary
         // storagePower is positive + Any power going to ESS is a surplus because the minimal SOC of ESS has been
         // reached
-        availableSurplusW += state.storagePower().doubleValue();
+        availableSurplusW += state.storagePower().intValue();
 
-        if (config.enableInverterLimitingHeuristic()) {
-            availableSurplusW += getPotentialSurplusDueToFullESSandInverterLimitation(state, config);
+        // ignore operating power draws from ESS or grid if there are any
+        if (availableSurplusW < 0 && -availableSurplusW <= config.toleratedPowerDraw().doubleValue()) {
+            availableSurplusW = 0;
         }
 
+        // any currently switched on appliances could be from lower priorities, therefore we count them as available
+        // surplus (if they are not actually turned on, the surplus will not be there and the loads get turned off)
+        // todo test
+        availableSurplusW += currentlySwitchedOnWattage;
+
+        if (config.enableInverterLimitingHeuristic()) {
+            availableSurplusW += getPotentialSurplusDueToFullESSandInverterLimitation(availableSurplusW, state, config,
+                    currentlySwitchedOnWattage);
+        }
+
+        // if there is a surplus, some of it should be available to other needs according to user
         if (availableSurplusW > 0) {
-            // if there is a surplus, some of it should be available to other needs according to user
-            availableSurplusW -= config.minAvailableSurplusEnergy().longValue();
-            // any currently switched on appliances could be from lower priorities, therefore we count them as available
-            // surplus
-            availableSurplusW += currentlySwitchedOnWattage;
+            availableSurplusW -= config.minAvailableSurplusEnergy().intValue();
         }
 
         LOGGER.debug("Calculated Surplus: {}W", availableSurplusW);
@@ -158,15 +152,16 @@ public class SurplusDecisionEngine {
      * available, the output channel will be switched off eventually in the next cycles, because it will either
      * consume from the grid or the battery which leads to lower available surplus energy in the next cycle.
      */
-    private double getPotentialSurplusDueToFullESSandInverterLimitation(InputItemsState state,
-            EnergyManagerConfiguration config) {
-        if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()) {
-            if (DecimalType.ZERO.equals(state.gridPower())
-                    // some power going to the ESS is allowed, but none from it
-                    && state.storagePower().longValue() >= 0
-                    && state.productionPower().longValue() < config.maxProductionPower().longValue()) {
-                return config.maxProductionPower().longValue() - state.productionPower().longValue();
-            }
+    private int getPotentialSurplusDueToFullESSandInverterLimitation(int calculatedSurplus, InputItemsState state,
+            EnergyManagerConfiguration config, int currentlySwitchedOnPower) {
+        if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()
+                // if the calculated surplus is less than the switched on power, there really is no surplus and no
+                // heuristic can be applied
+                // if there is some surplus going to the ESS, or to the grid, we allow it, but signaled loads have
+                // higher priority here
+                && calculatedSurplus >= currentlySwitchedOnPower
+                && state.productionPower().longValue() < config.peakProductionPower().longValue()) {
+            return config.peakProductionPower().intValue() - state.productionPower().intValue();
         }
         return 0;
     }

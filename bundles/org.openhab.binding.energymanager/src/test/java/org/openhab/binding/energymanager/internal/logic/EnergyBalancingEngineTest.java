@@ -69,7 +69,7 @@ class EnergyBalancingEngineTest {
 
     private final String channeluidprefix = "energymanager:signalizator:test:";
 
-    private final int MAX_PRODUCTION_POWER = 10_000;
+    private final int PEAK_PRODUCTION_POWER = 10_000;
     private final String MIN_STORAGE_SOC = "min_storage_soc";
     private final String MAX_STORAGE_SOC = "max_storage_soc";
     private final String PROD_PWR = "prod_pwr";
@@ -79,8 +79,8 @@ class EnergyBalancingEngineTest {
     private final String ELECTRICITY_PRICE = "electricity_price";
 
     EnergyManagerConfiguration config = new EnergyManagerConfiguration(new BigDecimal(30),
-            new BigDecimal(MAX_PRODUCTION_POWER), MIN_STORAGE_SOC, MAX_STORAGE_SOC, PROD_PWR, GRID_POWER, STORAGE_SOC,
-            STORAGE_POWER, ELECTRICITY_PRICE, new BigDecimal(0), new BigDecimal(0), true, true, new BigDecimal(50));
+            new BigDecimal(PEAK_PRODUCTION_POWER), MIN_STORAGE_SOC, MAX_STORAGE_SOC, PROD_PWR, GRID_POWER, STORAGE_SOC,
+            STORAGE_POWER, ELECTRICITY_PRICE, new BigDecimal(0), new BigDecimal(0), true, true, new BigDecimal(0));
 
     @Test
     void testEvaluateEnergy() {
@@ -92,29 +92,77 @@ class EnergyBalancingEngineTest {
         doReturn(stateBuilder.build()).when(energyBalancingEngine).buildEnergyState(any());
         var outputChannels = new ArrayList<>(List.of(
                 Map.entry(new ChannelUID(channeluidprefix + "prio1"),
-                        SurplusOutputParameters.builder().loadPower(1000).switchingPower(300).priority(1).build()),
+                        SurplusOutputParameters.builder().loadPower(1000).priority(1).build()),
                 Map.entry(new ChannelUID(channeluidprefix + "prio2"),
-                        SurplusOutputParameters.builder().loadPower(2000).switchingPower(1000).priority(2).build())));
+                        SurplusOutputParameters.builder().loadPower(2000).priority(2).build())));
         doNothing().when(updateStateFunction).accept(any(), any());
+
+        int p1on = 0;
+        int p1off = 0;
+        int p2on = 0;
+        int p2off = 0;
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
 
         // verify only highest priority has been turned on
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
-        doReturn(stateBuilder.storagePower(new DecimalType(2000)).build()).when(energyBalancingEngine)
+        doReturn(stateBuilder.storagePower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
         doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
+        p2off++;
 
-        // verify both loads are turned on
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
+        // verify prio1 stays on and prio2 stays off
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
+
+        // setup subsequent call prio1 stayed on and prio2 gets turned on as well
+        doReturn(stateBuilder.storagePower(new DecimalType(2000)).build()).when(energyBalancingEngine)
+                .buildEnergyState(any());
+
+        // invoke
+        energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
+        p2on++;
+
+        // verify both loads are now turned on
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
         doReturn(stateBuilder.storagePower(new DecimalType(0)).build()).when(energyBalancingEngine)
@@ -124,69 +172,107 @@ class EnergyBalancingEngineTest {
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
+        p2on++;
 
-        // verify no update has happened now
-        verify(updateStateFunction, times(3)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
-        verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
+        // verify both stay on
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(-1000)).storagePower(new DecimalType(0)).build())
                 .when(energyBalancingEngine).buildEnergyState(any());
-        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
+        p2off++;
 
         // verify prio2 has been shed
-        verify(updateStateFunction, times(3)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
         doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1on++;
+        p2off++;
 
         // verify prio2 has been shed and does not get turned on
-        verify(updateStateFunction, times(4)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(-700)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
-        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invokes
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1off++;
 
-        // verify prio1 has been shed as well and previously turned off prio2 is untouched
-        verify(updateStateFunction, times(4)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
+        // verify prio1 has been shed as well
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
+
+        // ------------------------------------------------------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------------------------------------------------------
 
         // setup subsequent call
         doReturn(stateBuilder.gridPower(new DecimalType(0)).build()).when(energyBalancingEngine)
                 .buildEnergyState(any());
-        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
         doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invokes
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
+        p1off++;
+        p2off++;
 
         // verify neither is turned on afterward
-        verify(updateStateFunction, times(4)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
-        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(3)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p1on)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p1off)).accept(eq(new ChannelUID(channeluidprefix + "prio1")),
+                eq(OnOffType.OFF));
+        verify(updateStateFunction, times(p2on)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.ON));
+        verify(updateStateFunction, times(p2off)).accept(eq(new ChannelUID(channeluidprefix + "prio2")),
+                eq(OnOffType.OFF));
     }
 
     @Test
@@ -199,10 +285,12 @@ class EnergyBalancingEngineTest {
         doReturn(stateBuilder.build()).when(energyBalancingEngine).buildEnergyState(any());
         var outputChannels = new ArrayList<>(List.of(
                 Map.entry(new ChannelUID(channeluidprefix + "prio1"),
-                        SurplusOutputParameters.builder().loadPower(5000).switchingPower(3000).priority(1).build()),
+                        SurplusOutputParameters.builder().loadPower(5000).priority(1).build()),
                 Map.entry(new ChannelUID(channeluidprefix + "prio2"),
-                        SurplusOutputParameters.builder().loadPower(2000).switchingPower(1000).priority(2).build())));
+                        SurplusOutputParameters.builder().loadPower(2000).priority(2).build())));
         doNothing().when(updateStateFunction).accept(any(), any());
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
+        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
 
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
@@ -215,9 +303,8 @@ class EnergyBalancingEngineTest {
         verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
 
         // setup subsequent call
-        doReturn(stateBuilder.productionPower(new DecimalType(5000)).storagePower(new DecimalType(-2000)).build())
+        doReturn(stateBuilder.productionPower(new DecimalType(7000)).storagePower(new DecimalType(-1000)).build())
                 .when(energyBalancingEngine).buildEnergyState(any());
-        doReturn(OnOffType.OFF).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio2")));
         doReturn(OnOffType.ON).when(outputStateHolder).getState(eq(new ChannelUID(channeluidprefix + "prio1")));
 
         // invokes
@@ -241,7 +328,7 @@ class EnergyBalancingEngineTest {
         doReturn(stateBuilder.build()).when(energyBalancingEngine).buildEnergyState(any());
         var outputChannels = new ArrayList<>(List.of(
                 Map.entry(new ChannelUID(channeluidprefix + "prio1"),
-                        SurplusOutputParameters.builder().loadPower(5000).switchingPower(3000).priority(1).build()),
+                        SurplusOutputParameters.builder().loadPower(5000).priority(1).build()),
                 Map.entry(new ChannelUID(channeluidprefix + "prio2"), SurplusOutputParameters.builder().loadPower(500)
                         .priority(2).minRuntimeMinutes(2).minCooldownMinutes(2).build())));
         doNothing().when(updateStateFunction).accept(any(), any());
@@ -282,7 +369,7 @@ class EnergyBalancingEngineTest {
         // energy for it
         // but its minimal runtime has not been reached
         verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
         verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
         verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
 
@@ -292,10 +379,9 @@ class EnergyBalancingEngineTest {
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
 
-        // verify that prio1 is not touched in load shedding and prio2 gets turned off because its minimal runtime has
-        // been reached
+        // verify prio2 gets turned off because its minimal runtime has been reached
         verify(updateStateFunction, never()).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(3)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
         verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
         verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
     }
@@ -310,7 +396,7 @@ class EnergyBalancingEngineTest {
         doReturn(stateBuilder.build()).when(energyBalancingEngine).buildEnergyState(any());
         var outputChannels = new ArrayList<>(List.of(
                 Map.entry(new ChannelUID(channeluidprefix + "prio1"),
-                        SurplusOutputParameters.builder().loadPower(2000).switchingPower(2000).priority(1).build()),
+                        SurplusOutputParameters.builder().loadPower(2000).priority(1).build()),
                 Map.entry(new ChannelUID(channeluidprefix + "prio2"),
                         SurplusOutputParameters.builder().loadPower(500).priority(2).build())));
         doNothing().when(updateStateFunction).accept(any(), any());
@@ -349,10 +435,11 @@ class EnergyBalancingEngineTest {
         // invoke
         energyBalancingEngine.evaluateEnergyBalance(config, thing, outputChannels, (__) -> true, updateStateFunction);
 
-        // verify that prio1 is not touched in load shedding and prio2 gets turned off because there is not enough power
+        // verify that prio1 stays turned off in load shedding and prio2 gets turned off because there is not enough
+        // power
         // for it
         verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.ON));
-        verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
+        verify(updateStateFunction, times(2)).accept(eq(new ChannelUID(channeluidprefix + "prio1")), eq(OnOffType.OFF));
         verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.ON));
         verify(updateStateFunction, times(1)).accept(eq(new ChannelUID(channeluidprefix + "prio2")), eq(OnOffType.OFF));
     }
