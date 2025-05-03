@@ -23,39 +23,12 @@
 				</description>
 			</parameter>
 
-			<!-- Required configuration of used item names or static value -->
-			<parameter name="minStorageSoc" type="text" required="true">
-				<label>Minimal SOC</label>
-				<description>
-					Do not signal surplus availability if Battery SOC is below the value of the linked Item.
-					Set as integer
-					if dynamic setting using an item is not needed.
-				</description>
-				<default>20</default>
-			</parameter>
-			<parameter name="maxStorageSoc" type="text" required="true">
-				<label>Maxiamal SOC</label>
-				<description>
-					Link to Item representing maximum ESS SOC (in Percent, 0-100).
-					Set as integer if dynamic setting using
-					an item is not needed.
-				</description>
-				<default>100</default>
-			</parameter>
 
-			<!-- Required configuration of used item names -->
+
+			<!-- Required configuration of used items by their name -->
 			<parameter name="productionPower" type="text" required="true">
 				<label>Item production power (W)</label>
 				<description>Name of Item representing current local generation power (in Watts, positive).</description>
-			</parameter>
-			<parameter name="storageSoc" type="text" required="true">
-				<label>Item ESS SOC (%)</label>
-				<description>Name of Item representing Battery SOC (in Percent, 0-100).</description>
-			</parameter>
-			<parameter name="storagePower" type="text" required="true">
-				<label>ESS power (W)</label>
-				<description>Name to Item representing ESS power draw (in Watts, negative=discharging, positive=charging).
-				</description>
 			</parameter>
 			<parameter name="electricityPrice" type="text" required="true">
 				<label>Current electricity price</label>
@@ -63,6 +36,45 @@
 					Name of Item representing the current electricity price (e.g., EUR/MWh or unitless).
 					Has to be the same
 					unit as configuration parameters of the output channels.
+				</description>
+			</parameter>
+
+			<!-- Non required configuration of used items by their name -->
+			<parameter name="storageSoc" type="text">
+				<label>Item ESS SOC (%)</label>
+				<description>
+					Do not fill out if there is no ESS connected.
+					Name of item representing Battery SOC (in Percent, 0-100).
+				</description>
+			</parameter>
+			<parameter name="storagePower" type="text">
+				<label>ESS power (W)</label>
+				<description>
+					Do not fill out if there is no ESS connected.
+					Name to item representing ESS power draw (in Watts,
+					negative=discharging, positive=charging).
+				</description>
+			</parameter>
+
+			<!-- Non required configuration of used item names or static value -->
+			<parameter name="minStorageSoc" type="text" required="false">
+				<label>Minimal SOC</label>
+				<description>
+					If there is no ESS, do not fill out.
+					Do not signal surplus availability if ESS SOC is below the value of
+					the linked Item.
+					Set as integer
+					if dynamic setting using an item is not needed.
+				</description>
+			</parameter>
+			<parameter name="maxStorageSoc" type="text" required="false">
+				<label>Maxiamal SOC</label>
+				<description>
+					If there is no ESS, do not fill out.
+					Link to Item representing maximum ESS SOC (in Percent, 0-100).
+					Set
+					as integer if dynamic setting using
+					an item is not needed.
 				</description>
 			</parameter>
 
@@ -100,7 +112,7 @@
 				<description>
 					Experimental feature which enables calculation of surplus energy once the maximum SOC of the ESS
 					is
-					reached. If there is some production and there is no energy going from or to the grid, it
+					reached and grid feed in is limited.
 				</description>
 				<default>false</default>
 			</parameter>

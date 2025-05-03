@@ -34,6 +34,7 @@ import org.openhab.binding.energymanager.internal.logic.EnergyBalancingEngine;
 import org.openhab.binding.energymanager.internal.logic.SurplusDecisionEngine;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerInputStateHolder;
 import org.openhab.binding.energymanager.internal.state.EnergyManagerOutputStateHolder;
+import org.openhab.binding.energymanager.internal.util.ConfigUtilService;
 import org.openhab.core.items.events.ItemEventFactory;
 import org.openhab.core.items.events.ItemStateEvent;
 import org.openhab.core.library.types.OnOffType;
@@ -68,6 +69,9 @@ class EnergyManagerHandlerTest {
     EnergyBalancingEngine energyBalancingEngine;
 
     @Mock
+    ConfigUtilService configUtilService;
+
+    @Mock
     Thing thing;
 
     private final String MIN_STORAGE_SOC = "min_storage_soc";
@@ -79,7 +83,7 @@ class EnergyManagerHandlerTest {
     private final String ELECTRICITY_PRICE = "electricity_price";
 
     EnergyManagerConfiguration config = new EnergyManagerConfiguration(new BigDecimal(30), new BigDecimal(10_000),
-            MIN_STORAGE_SOC, MAX_STORAGE_SOC, PROD_PWR, GRID_POWER, STORAGE_SOC, STORAGE_POWER, ELECTRICITY_PRICE,
+            PROD_PWR, GRID_POWER, ELECTRICITY_PRICE, MIN_STORAGE_SOC, MAX_STORAGE_SOC, STORAGE_SOC, STORAGE_POWER,
             new BigDecimal(0), new BigDecimal(0), true, true, new BigDecimal(50));
 
     @BeforeEach
@@ -143,9 +147,9 @@ class EnergyManagerHandlerTest {
         itemMapping.put(STORAGE_SOC, ThingParameterItemName.STORAGE_SOC);
         itemMapping.put(STORAGE_POWER, ThingParameterItemName.STORAGE_POWER);
         itemMapping.put(ELECTRICITY_PRICE, ThingParameterItemName.ELECTRICITY_PRICE);
-        var newConfig = new EnergyManagerConfiguration(config.refreshInterval(), config.peakProductionPower(), "30",
-                "30", config.productionPower(), config.gridPower(), config.storageSoc(), config.storagePower(),
-                config.electricityPrice(), config.minAvailableSurplusEnergy(), config.initialDelay(),
+        var newConfig = new EnergyManagerConfiguration(config.refreshInterval(), config.peakProductionPower(),
+                config.productionPower(), config.gridPower(), config.electricityPrice(), "30", "30",
+                config.storageSoc(), config.storagePower(), config.minAvailableSurplusEnergy(), config.initialDelay(),
                 config.toggleOnNegativePrice(), config.enableInverterLimitingHeuristic(), config.toleratedPowerDraw());
 
         // invoke
@@ -187,5 +191,32 @@ class EnergyManagerHandlerTest {
 
         // cleanup
         managerHandler.stopEvaluationJob();
+    }
+
+    @Test
+    void testConfigValidation() {
+        Map<String, Object> propertiesMap = new HashMap<>();
+        propertiesMap.put("toggleOnNegativePrice", true);
+        propertiesMap.put("gridPower", "gridPower"); // gridPower is required
+        propertiesMap.put("storagePower", null);
+        propertiesMap.put("electricityPrice", "electricityPrice");
+        propertiesMap.put("minAvailableSurplusEnergy", new BigDecimal(1));
+        propertiesMap.put("refreshInterval", new BigDecimal(30));
+        propertiesMap.put("storageSoc", null);
+        propertiesMap.put("minStorageSoc", "I SHOULD NOT BE FILLED"); // validated later
+        propertiesMap.put("maxStorageSoc", null);
+        propertiesMap.put("productionPower", "prodPower");
+        propertiesMap.put("peakProductionPower", new BigDecimal(60));
+        propertiesMap.put("initialDelay", new BigDecimal(60));
+        propertiesMap.put("enableInverterLimitingHeuristic", true);
+        propertiesMap.put("toleratedPowerDraw", new BigDecimal(60));
+
+        EnergyManagerConfiguration config = new EnergyManagerConfiguration(propertiesMap);
+
+        doReturn(config).when(configUtilService).getTypedConfig(any());
+
+        EnergyManagerConfiguration result = managerHandler.loadAndValidateConfig();
+
+        assertNull(result);
     }
 }

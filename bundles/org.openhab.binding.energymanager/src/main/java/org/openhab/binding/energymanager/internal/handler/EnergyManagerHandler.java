@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
@@ -111,16 +112,28 @@ public class EnergyManagerHandler extends BaseThingHandler {
             switch (inputStateName) {
                 case PRODUCTION_POWER -> itemMapping.put(config.productionPower(), inputStateName);
                 case GRID_POWER -> itemMapping.put(config.gridPower(), inputStateName);
-                case STORAGE_SOC -> itemMapping.put(config.storageSoc(), inputStateName);
-                case STORAGE_POWER -> itemMapping.put(config.storagePower(), inputStateName);
+                case STORAGE_SOC -> {
+                    if (config.storageSoc() != null) {
+                        var storage = (@NonNull String) config.storageSoc();
+                        itemMapping.put(storage, inputStateName);
+                    }
+                }
+                case STORAGE_POWER -> {
+                    if (config.storagePower() != null) {
+                        var storage = (@NonNull String) config.storagePower();
+                        itemMapping.put(storage, inputStateName);
+                    }
+                }
                 case ELECTRICITY_PRICE -> itemMapping.put(config.electricityPrice(), inputStateName);
                 case MIN_STORAGE_SOC, MAX_STORAGE_SOC -> {
                     var configVal = MIN_STORAGE_SOC.equals(inputStateName) ? config.minStorageSoc()
                             : config.maxStorageSoc();
-                    try {
-                        Integer.parseInt(configVal);
-                    } catch (NumberFormatException e) {
-                        itemMapping.put(configVal, inputStateName);
+                    if (configVal != null) {
+                        try {
+                            Integer.parseInt(configVal);
+                        } catch (NumberFormatException e) {
+                            itemMapping.put(configVal, inputStateName);
+                        }
                     }
                 }
             }
@@ -129,12 +142,31 @@ public class EnergyManagerHandler extends BaseThingHandler {
         eventSubscriber.registerEventsFor(thing.getUID(), itemMapping, this::handleItemStateUpdate);
     }
 
+    // only because of stubbed tests
+    protected Map<String, Object> getConfigProperties() {
+        var config = getConfig();
+        if (config != null) {
+            return config.getProperties();
+        }
+        return null;
+    }
+
     protected @Nullable EnergyManagerConfiguration loadAndValidateConfig() {
-        EnergyManagerConfiguration config = configUtilService.getTypedConfig(getConfig().getProperties());
+        EnergyManagerConfiguration config = configUtilService.getTypedConfig(getConfigProperties());
 
         if (config == null) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Converted configuration is null " + getConfig());
+            return null;
+        }
+
+        @Nullable
+        String[] array = { config.storageSoc(), config.maxStorageSoc(), config.minStorageSoc(), config.storagePower() };
+        boolean allNull = Arrays.stream(array).allMatch(Objects::isNull);
+        boolean someNull = Arrays.stream(array).anyMatch(Objects::isNull);
+        if (someNull && !allNull) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Either all ESS related parameters have to be filled out or none.");
             return null;
         }
 
@@ -259,7 +291,7 @@ public class EnergyManagerHandler extends BaseThingHandler {
         outputStateHolder.saveState(channelUID.getId(), newState, newState != previousState);
         if (forceUpdate || newState != previousState) {
             updateState(channelUID, newState);
-            LOGGER.info("Changed status of channel {} to {}", channelUID.getId(), newState);
+            LOGGER.debug("Changed status of channel {} to {}", channelUID.getId(), newState);
         } else {
             LOGGER.debug("Channel {} state ({}) unchanged.", channelUID.getId(), newState);
         }
@@ -296,7 +328,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
             return false;
         }
 
-        if (state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
+        if (state.storageSoc() != null && state.minStorageSoc() != null
+                && state.storageSoc().doubleValue() < state.minStorageSoc().doubleValue()) {
             LOGGER.info("Battery SOC {}% is below minimum {}%. Signaling OFF to all loads.",
                     state.storageSoc().doubleValue(), state.minStorageSoc().doubleValue());
             updateAllOutputChannels(OnOffType.OFF, false);

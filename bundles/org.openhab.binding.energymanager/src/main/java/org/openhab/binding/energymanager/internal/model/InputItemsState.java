@@ -23,8 +23,8 @@ import org.openhab.core.library.types.DecimalType;
  * @author <Štěpán Beran> - Initial contribution
  */
 @NonNullByDefault
-public record InputItemsState(DecimalType productionPower, DecimalType gridPower, DecimalType storageSoc,
-        DecimalType storagePower, DecimalType minStorageSoc, DecimalType maxStorageSoc,
+public record InputItemsState(DecimalType productionPower, DecimalType gridPower, @Nullable DecimalType storageSoc,
+        @Nullable DecimalType storagePower, @Nullable DecimalType minStorageSoc, @Nullable DecimalType maxStorageSoc,
         @Nullable DecimalType electricityPrice) {
 
     public static InputItemsStateBuilder builder() {
@@ -34,10 +34,10 @@ public record InputItemsState(DecimalType productionPower, DecimalType gridPower
     public static class InputItemsStateBuilder {
         private DecimalType productionPower = DecimalType.ZERO;
         private DecimalType gridPower = DecimalType.ZERO;
-        private DecimalType storageSoc = DecimalType.ZERO;
-        private DecimalType storagePower = DecimalType.ZERO;
-        private DecimalType minStorageSoc = DecimalType.ZERO;
-        private DecimalType maxStorageSoc = DecimalType.ZERO;
+        private @Nullable DecimalType storageSoc;
+        private @Nullable DecimalType storagePower;
+        private @Nullable DecimalType minStorageSoc;
+        private @Nullable DecimalType maxStorageSoc;
         private @Nullable DecimalType electricityPrice;
 
         public InputItemsStateBuilder() {
@@ -65,22 +65,22 @@ public record InputItemsState(DecimalType productionPower, DecimalType gridPower
             return this;
         }
 
-        public InputItemsStateBuilder storageSoc(DecimalType storageSoc) {
+        public InputItemsStateBuilder storageSoc(@Nullable DecimalType storageSoc) {
             this.storageSoc = storageSoc;
             return this;
         }
 
-        public InputItemsStateBuilder storagePower(DecimalType storagePower) {
+        public InputItemsStateBuilder storagePower(@Nullable DecimalType storagePower) {
             this.storagePower = storagePower;
             return this;
         }
 
-        public InputItemsStateBuilder minStorageSoc(DecimalType minStorageSoc) {
+        public InputItemsStateBuilder minStorageSoc(@Nullable DecimalType minStorageSoc) {
             this.minStorageSoc = minStorageSoc;
             return this;
         }
 
-        public InputItemsStateBuilder maxStorageSoc(DecimalType maxStorageSoc) {
+        public InputItemsStateBuilder maxStorageSoc(@Nullable DecimalType maxStorageSoc) {
             this.maxStorageSoc = maxStorageSoc;
             return this;
         }
@@ -93,15 +93,13 @@ public record InputItemsState(DecimalType productionPower, DecimalType gridPower
         /**
          * Validated by default setting to {@link DecimalType#ZERO} singleton and then comparing the references using
          * ==.
-         * 
+         *
          * @return validated instance of ManagerState
          * @throws IllegalArgumentException if @NotNull values have not been initialized
          */
         public InputItemsState build() {
-            if (productionPower == DecimalType.ZERO || gridPower == DecimalType.ZERO || storageSoc == DecimalType.ZERO
-                    || storagePower == DecimalType.ZERO || minStorageSoc == DecimalType.ZERO
-                    || maxStorageSoc == DecimalType.ZERO) {
-                throw new IllegalArgumentException();
+            if (productionPower == DecimalType.ZERO || gridPower == DecimalType.ZERO) {
+                throw new IllegalArgumentException("One or more required fields missing.");
             }
             return new InputItemsState(productionPower, gridPower, storageSoc, storagePower, minStorageSoc,
                     maxStorageSoc, electricityPrice);

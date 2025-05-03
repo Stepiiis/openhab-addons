@@ -113,13 +113,13 @@ public class SurplusDecisionEngine {
             return 0;
         }
 
-        // All grid feed in is considered surplus energy, however any grid consumption should be avoided if possible
+        // grid feed-in is considered surplus energy, however any grid consumption should be avoided if possible
         int availableSurplusW = state.gridPower().intValue();
 
-        // storagePower is negative - Using energy from the battery which should be avoided if not necessary
-        // storagePower is positive + Any power going to ESS is a surplus because the minimal SOC of ESS has been
-        // reached
-        availableSurplusW += state.storagePower().intValue();
+        if (state.storagePower() != null) {
+            // storage feed-in once minSOC is reached is considered as surplus and any storage draw should be avoided
+            availableSurplusW += state.storagePower().intValue();
+        }
 
         // ignore operating power draws from ESS or grid if there are any
         if (availableSurplusW < 0 && -availableSurplusW <= config.toleratedPowerDraw().doubleValue()) {
@@ -154,11 +154,11 @@ public class SurplusDecisionEngine {
      */
     private int getPotentialSurplusDueToFullESSandInverterLimitation(int calculatedSurplus, InputItemsState state,
             EnergyManagerConfiguration config, int currentlySwitchedOnPower) {
-        if (state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()
+        if (state.storageSoc() != null && state.maxStorageSoc() != null
+                && state.storageSoc().doubleValue() >= state.maxStorageSoc().doubleValue()
                 // if the calculated surplus is less than the switched on power, there really is no surplus and no
                 // heuristic can be applied
-                // if there is some surplus going to the ESS, or to the grid, we allow it, but signaled loads have
-                // higher priority here
+                // if there is some surplus going to the ESS, or to the grid, we allow it
                 && calculatedSurplus >= currentlySwitchedOnPower
                 && state.productionPower().longValue() < config.peakProductionPower().longValue()) {
             return config.peakProductionPower().intValue() - state.productionPower().intValue();

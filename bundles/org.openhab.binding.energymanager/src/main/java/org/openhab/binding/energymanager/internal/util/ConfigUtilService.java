@@ -14,19 +14,12 @@ package org.openhab.binding.energymanager.internal.util;
 
 import static org.openhab.binding.energymanager.internal.enums.ThingParameterItemName.MIN_STORAGE_SOC;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.energymanager.internal.EnergyManagerBindingConstants;
 import org.openhab.binding.energymanager.internal.EnergyManagerConfiguration;
 import org.openhab.binding.energymanager.internal.enums.SurplusOutputParametersEnum;
 import org.openhab.binding.energymanager.internal.enums.ThingParameterItemName;
@@ -94,26 +87,7 @@ public class ConfigUtilService {
     }
 
     public @Nullable EnergyManagerConfiguration getTypedConfig(Map<String, Object> properties) {
-        Field[] fields = EnergyManagerConfiguration.class.getDeclaredFields();
-        List<Object> values = new ArrayList<>();
-
-        for (var field : fields) {
-            Object prop = properties.get(field.getName());
-            if (prop != null) {
-                values.add(prop);
-            } else {
-                LOGGER.error("Failed to resolve field {} from the thing properties.", field.getName());
-                return null;
-            }
-        }
-
-        Constructor<?> constructor = EnergyManagerConfiguration.class.getConstructors()[0];
-        try {
-            return (EnergyManagerConfiguration) constructor.newInstance(values.toArray());
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException ex) {
-            LOGGER.error("Failed to create an instance of EnergyManagerConfiguration due to incorrect config.");
-        }
-        return null;
+        return new EnergyManagerConfiguration(properties);
     }
 
     private static @Nullable Object parseValue(Class<?> type, Object value) {
@@ -136,6 +110,7 @@ public class ConfigUtilService {
     public DecimalType getInputStateInDecimal(ThingParameterItemName item) {
         Type state = inputStateHolder.getState(item.getChannelId());
 
+        // not using pattern matching for backwards compatibility with OH < 5.0.0
         if (state == null) {
             return null;
         } else if (state instanceof QuantityType<?> quantityType) {
@@ -159,17 +134,19 @@ public class ConfigUtilService {
         }
     }
 
-    public DecimalType getMinSocOrDefault(EnergyManagerConfiguration config) {
-        return getDecimalFromStringOrItemStateOrDefaultValue(config.minStorageSoc(),
-                EnergyManagerBindingConstants.DEFAULT_MIN_STORAGE_SOC);
+    public @Nullable DecimalType getMinSocOrDefault(EnergyManagerConfiguration config) {
+        return getDecimalFromStringOrItemStateOrNull(config.minStorageSoc());
     }
 
-    public DecimalType getMaxSocOrDefault(EnergyManagerConfiguration config) {
-        return getDecimalFromStringOrItemStateOrDefaultValue(config.maxStorageSoc(),
-                EnergyManagerBindingConstants.DEFAULT_MAX_STORAGE_SOC);
+    public @Nullable DecimalType getMaxSocOrDefault(EnergyManagerConfiguration config) {
+        return getDecimalFromStringOrItemStateOrNull(config.maxStorageSoc());
     }
 
-    private DecimalType getDecimalFromStringOrItemStateOrDefaultValue(String configValue, DecimalType defaultValue) {
+    private @Nullable DecimalType getDecimalFromStringOrItemStateOrNull(@Nullable String configValue) {
+        if (configValue == null) {
+            return null;
+        }
+
         try {
             Integer fromConfig = Integer.valueOf(configValue);
             return new DecimalType(fromConfig);
@@ -178,8 +155,7 @@ public class ConfigUtilService {
         }
 
         DecimalType fromChannel = this.getInputStateInDecimal(MIN_STORAGE_SOC);
-        DecimalType result = fromChannel != null ? fromChannel : defaultValue;
-        LOGGER.debug("Converted value from config is {}", result);
-        return result;
+        LOGGER.debug("Converted value from config is {}", fromChannel);
+        return fromChannel;
     }
 }

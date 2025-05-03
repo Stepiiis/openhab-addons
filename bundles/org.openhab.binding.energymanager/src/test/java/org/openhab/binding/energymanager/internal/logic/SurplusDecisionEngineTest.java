@@ -46,6 +46,8 @@ class SurplusDecisionEngineTest {
 
         if (electricityPrice != null) {
             builder.electricityPrice(new DecimalType(electricityPrice));
+        } else {
+            builder.electricityPrice(new DecimalType(1));
         }
 
         // Defaults for non-critical fields
@@ -289,7 +291,7 @@ class SurplusDecisionEngineTest {
         int currentlyRunningW = 500;
 
         // invoke
-        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, 500);
+        double availableSurplusW = surplusDecisionEngine.getAvailableSurplusWattage(state, config, currentlyRunningW);
 
         // verifiy
         assertEquals(0, availableSurplusW, 0.001);

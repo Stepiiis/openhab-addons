@@ -20,7 +20,6 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -73,12 +72,9 @@ public class ConfigUtilServiceTest {
                 Field recordField = SurplusOutputParameters.class.getDeclaredField(propertyName);
                 Class<?> fieldType = recordField.getType();
 
-                // Adjust for primitive types
-                Class<?> paramType = fieldType.isPrimitive() ? fieldType : fieldType;
-
                 // Check builder method exists with the correct parameter type
                 Method method = SurplusOutputParameters.SurplusOutputParametersBuilder.class.getMethod(propertyName,
-                        paramType);
+                        fieldType);
                 assertNotNull(method, "Builder method " + propertyName + " should exist");
             } catch (NoSuchFieldException | NoSuchMethodException e) {
                 fail("Builder method " + propertyName + " not found for enum " + enumValue.name());
@@ -90,7 +86,7 @@ public class ConfigUtilServiceTest {
     @Test
     void allRecordFieldsHaveEnumProperty() {
         var recordFields = Arrays.stream(SurplusOutputParameters.class.getDeclaredFields()).map(Field::getName)
-                .collect(Collectors.toList());
+                .toList();
 
         for (String fieldName : recordFields) {
             boolean found = Arrays.stream(SurplusOutputParametersEnum.values())
@@ -152,6 +148,80 @@ public class ConfigUtilServiceTest {
         assertEquals("storageSoc", result.storageSoc());
         assertEquals("50", result.minStorageSoc());
         assertEquals("95", result.maxStorageSoc());
+        assertEquals("prodPower", result.productionPower());
+        assertEquals(new BigDecimal(60), result.peakProductionPower());
+        assertEquals(new BigDecimal(60), result.initialDelay());
+        assertEquals(true, result.enableInverterLimitingHeuristic());
+        assertEquals(new BigDecimal(60), result.toleratedPowerDraw());
+    }
+
+    @Test
+    void testGetTypedConfigWithNullValues() {
+        Map<String, Object> propertiesMap = new HashMap<>();
+        propertiesMap.put("toggleOnNegativePrice", true);
+        propertiesMap.put("gridPower", "gridPower");
+        propertiesMap.put("storagePower", null);
+        propertiesMap.put("electricityPrice", "electricityPrice");
+        propertiesMap.put("minAvailableSurplusEnergy", new BigDecimal(1));
+        propertiesMap.put("refreshInterval", new BigDecimal(30));
+        propertiesMap.put("storageSoc", null);
+        propertiesMap.put("minStorageSoc", null);
+        propertiesMap.put("maxStorageSoc", null);
+        propertiesMap.put("productionPower", "prodPower");
+        propertiesMap.put("peakProductionPower", new BigDecimal(60));
+        propertiesMap.put("initialDelay", new BigDecimal(60));
+        propertiesMap.put("enableInverterLimitingHeuristic", true);
+        propertiesMap.put("toleratedPowerDraw", new BigDecimal(60));
+
+        EnergyManagerConfiguration result = configUtilService.getTypedConfig(propertiesMap);
+
+        assertNotNull(result);
+        assertEquals(true, result.toggleOnNegativePrice());
+        assertEquals("gridPower", result.gridPower());
+        assertNull(result.storagePower());
+        assertEquals("electricityPrice", result.electricityPrice());
+        assertEquals(new BigDecimal(1), result.minAvailableSurplusEnergy());
+        assertEquals(new BigDecimal(30), result.refreshInterval());
+        assertNull(result.storageSoc());
+        assertNull(result.minStorageSoc());
+        assertNull(result.maxStorageSoc());
+        assertEquals("prodPower", result.productionPower());
+        assertEquals(new BigDecimal(60), result.peakProductionPower());
+        assertEquals(new BigDecimal(60), result.initialDelay());
+        assertEquals(true, result.enableInverterLimitingHeuristic());
+        assertEquals(new BigDecimal(60), result.toleratedPowerDraw());
+    }
+
+    @Test
+    void testGetTypedConfigWithNullValuesGetsBuild_SomeESSFilledAndSomeNot() {
+        Map<String, Object> propertiesMap = new HashMap<>();
+        propertiesMap.put("toggleOnNegativePrice", true);
+        propertiesMap.put("gridPower", "gridPower"); // gridPower is required
+        propertiesMap.put("storagePower", null);
+        propertiesMap.put("electricityPrice", "electricityPrice");
+        propertiesMap.put("minAvailableSurplusEnergy", new BigDecimal(1));
+        propertiesMap.put("refreshInterval", new BigDecimal(30));
+        propertiesMap.put("storageSoc", null);
+        propertiesMap.put("minStorageSoc", "I SHOULD NOT BE FILLED"); // validated later
+        propertiesMap.put("maxStorageSoc", null);
+        propertiesMap.put("productionPower", "prodPower");
+        propertiesMap.put("peakProductionPower", new BigDecimal(60));
+        propertiesMap.put("initialDelay", new BigDecimal(60));
+        propertiesMap.put("enableInverterLimitingHeuristic", true);
+        propertiesMap.put("toleratedPowerDraw", new BigDecimal(60));
+
+        EnergyManagerConfiguration result = configUtilService.getTypedConfig(propertiesMap);
+
+        assertNotNull(result);
+        assertEquals(true, result.toggleOnNegativePrice());
+        assertEquals("gridPower", result.gridPower());
+        assertNull(result.storagePower());
+        assertEquals("electricityPrice", result.electricityPrice());
+        assertEquals(new BigDecimal(1), result.minAvailableSurplusEnergy());
+        assertEquals(new BigDecimal(30), result.refreshInterval());
+        assertNull(result.storageSoc());
+        assertEquals("I SHOULD NOT BE FILLED", result.minStorageSoc());
+        assertNull(result.maxStorageSoc());
         assertEquals("prodPower", result.productionPower());
         assertEquals(new BigDecimal(60), result.peakProductionPower());
         assertEquals(new BigDecimal(60), result.initialDelay());

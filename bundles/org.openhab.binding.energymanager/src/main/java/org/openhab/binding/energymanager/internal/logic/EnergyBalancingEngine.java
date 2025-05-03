@@ -149,22 +149,21 @@ public class EnergyBalancingEngine {
 
         DecimalType production = configUtilService.getInputStateInDecimal(PRODUCTION_POWER);
         DecimalType gridPower = configUtilService.getInputStateInDecimal(GRID_POWER);
-        DecimalType storageSoc = configUtilService.getInputStateInDecimal(STORAGE_SOC);
-        DecimalType storagePower = configUtilService.getInputStateInDecimal(STORAGE_POWER);
 
-        if (production == null || gridPower == null || storageSoc == null || storagePower == null) {
-            LOGGER.error("One or more required states is null {}={} {}={} {}={} {}={}", PRODUCTION_POWER, production,
-                    GRID_POWER, gridPower, STORAGE_SOC, storageSoc, STORAGE_POWER, storagePower);
+        if (production == null || gridPower == null) {
+            LOGGER.error("One or more required states is null {}={} {}={}", PRODUCTION_POWER, production, GRID_POWER,
+                    gridPower);
             return null;
         }
 
         // Required values
-        builder.productionPower(production).gridPower(gridPower).storageSoc(storageSoc).storagePower(storagePower)
+        builder.productionPower(production).gridPower(gridPower)
                 // optional values with default values or null if not needed
                 .electricityPrice(configUtilService.getInputStateInDecimal(ELECTRICITY_PRICE))
+                .storageSoc(configUtilService.getInputStateInDecimal(STORAGE_SOC))
+                .storagePower(configUtilService.getInputStateInDecimal(STORAGE_POWER))
                 .minStorageSoc(configUtilService.getMinSocOrDefault(config))
                 .maxStorageSoc(configUtilService.getMaxSocOrDefault(config));
-
         return builder.build();
     }
 }
