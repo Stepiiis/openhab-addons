@@ -182,6 +182,8 @@ public class EnergyManagerHandler extends BaseThingHandler {
         LOGGER.info("Disposing Energy Manager Handler for {}", getThing().getUID());
         stopEvaluationJob();
 
+        updateAllOutputChannels(OnOffType.OFF, true);
+
         outputStateHolder.clear();
         inputStateHolder.clear();
         updateStatus(ThingStatus.OFFLINE);
